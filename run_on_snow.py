@@ -49,7 +49,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "-p",
         "--python_binary",
-        default="/mnt/home/miniconda/envs/slot_filling/bin/python",
+        default="/mnt/home/miniconda/envs/rl4lms/bin/python",
         help="path to your python executable",
     )
     parser.add_argument(
