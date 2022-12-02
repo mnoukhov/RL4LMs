@@ -24,8 +24,8 @@ def run_exp(exp_dict, savedir, args):
         project_name="rl4lms",
         experiment_name=os.path.basename(args.exp_group),
         base_path_to_store_results=savedir,
-        entity_name="mila-mnoukhov",
-        log_to_wandb=False,
+        entity_name="mila-language-drift",
+        log_to_wandb=True,
     )
 
 
