@@ -67,7 +67,8 @@ if __name__ == "__main__":
 
         job_config = {
             "account_id": os.environ["EAI_ACCOUNT_ID"],
-            "image": "registry.console.elementai.com/snow.colab/cuda",
+            # "image": "registry.console.elementai.com/snow.colab_public/ssh",
+            "image": "registry.console.elementai.com/snow.huanggab.shared/nov2022:latest",
             "data": [
                 "snow.mnoukhov.home:/mnt/home",
                 "snow.colab.public:/mnt/public",
