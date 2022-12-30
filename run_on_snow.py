@@ -29,7 +29,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "-sb",
         "--savedir_base",
-        default="/mnt/home/results/rl4lms",
+        default="/home/toolkit/rl4lms/results",
         help="Define the base directory where the experiments will be saved.",
     )
     parser.add_argument(
@@ -49,7 +49,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "-p",
         "--python_binary",
-        default="/mnt/home/miniconda/envs/rl4lms/bin/python",
+        default="/home/toolkit/.conda/envs/rl4lms/bin/python",
         help="path to your python executable",
     )
     parser.add_argument(
@@ -62,19 +62,22 @@ if __name__ == "__main__":
     args, _ = parser.parse_known_args()
 
     if args.job_scheduler == "toolkit":
-        with open("/mnt/home/wandb_api_key", "r") as f:
+        with open("/home/toolkit/wandb_api_key", "r") as f:
             wandb_api_key = f.read().rstrip()
 
         job_config = {
             "account_id": os.environ["EAI_ACCOUNT_ID"],
+            # "image": "registry.console.elementai.com/snow.colab/cuda",
             # "image": "registry.console.elementai.com/snow.colab_public/ssh",
-            "image": "registry.console.elementai.com/snow.huanggab.shared/nov2022:latest",
+            # "image": "registry.console.elementai.com/snow.mnoukhov/rl4lms",
+            "image": "registry.console.elementai.com/snow.interactive_toolkit/default",
             "data": [
-                "snow.mnoukhov.home:/mnt/home",
+                "snow.mnoukhov.home:/home/toolkit",
                 "snow.colab.public:/mnt/public",
             ],
             "environment_vars": [
-                f"HF_HOME=/mnt/public/datasets/huggingface/",
+                "HOME=/home/toolkit",
+                f"HF_HOME=/home/toolkit/huggingface/",
                 f"WANDB_API_KEY={wandb_api_key}",
             ],
             "restartable": True,
