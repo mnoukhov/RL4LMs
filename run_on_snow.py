@@ -14,7 +14,7 @@ def run_exp(exp_dict, savedir, args):
         experiment_name=os.path.basename(args.exp_group),
         base_path_to_store_results=savedir,
         entity_name="mila-language-drift",
-        log_to_wandb=(args.job_scheduler is not None),
+        log_to_wandb=(not args.no_wandb),
     )
 
 
@@ -54,6 +54,9 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "-n", "--gpus", default=1, type=int, help="number of gpus to use for experiment"
+    )
+    parser.add_argument(
+        "--no-wandb", action="store_true", help="disable wandb", default=False
     )
     # parser.add_argument(
     #     "--exp-id", default=None, help="id used to resume an experiment"
