@@ -136,4 +136,4 @@ cluster_utils/
 **/wandb/
 
 # outputs
-rl4lm_exps
+results

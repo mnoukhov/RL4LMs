@@ -29,7 +29,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "-sb",
         "--savedir_base",
-        default="/home/toolkit/rl4lms/results",
+        default="/home/toolkit/RL4LMs/results",
         help="Define the base directory where the experiments will be saved.",
     )
     parser.add_argument(
@@ -108,7 +108,7 @@ if __name__ == "__main__":
         reset=args.reset,
         job_config=job_config,
         job_scheduler=job_scheduler,
-        results_fname="rl4lm_exps/notebook.ipynb",
+        results_fname="results/notebook.ipynb",
         python_binary_path=args.python_binary,
         args=args,
         use_threads=True,
