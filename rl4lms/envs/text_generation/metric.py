@@ -1,21 +1,27 @@
-from transformers import AutoModelForSequenceClassification, AutoTokenizer
-from transformers import PreTrainedModel
-import torch
-from typing import List, Dict, Tuple, Any
+import copy
 from abc import abstractmethod
+from typing import Any, Dict, List, Tuple
+
 import numpy as np
+import rouge
+import torch
 from datasets import load_metric
 from gem_metrics.msttr import MSTTR
 from gem_metrics.ngrams import NGramStats
+from gem_metrics.texts import Predictions
+from tqdm import tqdm
+from transformers import (
+    AutoModelForCausalLM,
+    AutoModelForSequenceClassification,
+    AutoTokenizer,
+    PreTrainedModel,
+)
+
+from rl4lms.data_pools.custom_text_generation_pools import DailyDialog
+from rl4lms.data_pools.task_utils.totto.eval_utils import compute_bleu, compute_parent
 from rl4lms.envs.text_generation.caption_metrics.cider import Cider
 from rl4lms.envs.text_generation.caption_metrics.spice.spice import Spice
-from gem_metrics.texts import Predictions
 from rl4lms.envs.text_generation.summ_metrics.summa_c import SummaCConv, SummaCZS
-from rl4lms.data_pools.task_utils.totto.eval_utils import compute_parent, compute_bleu
-from rl4lms.data_pools.custom_text_generation_pools import DailyDialog
-from tqdm import tqdm
-import copy
-import rouge
 
 
 class BaseMetric:
@@ -419,12 +425,23 @@ class Perplexity(BaseMetric):
         tokenizer_id: str,
         model_type: str = "causal",
         use_text_from_meta_data: bool = False,
+        model_name: str = None,
     ) -> None:
         super().__init__()
-        self._tokenizer_id = tokenizer_id
+        # self._tokenizer_id = tokenizer_id
         self._model_type = model_type
         self._stride = stride
         self._use_text_from_meta_data = use_text_from_meta_data
+        self._device = "cuda" if torch.cuda.is_available() else "cpu"
+        if model_name is not None:
+            self._tokenizer = AutoTokenizer.from_pretrained(model_name)
+            # self._tokenizer.truncation_side = "left"
+            self._model = AutoModelForCausalLM.from_pretrained(model_name).to(
+                self._device
+            )
+        else:
+            self._tokenizer = AutoTokenizer.from_pretrained(tokenizer_id)
+            self._model = None
 
     def get_device(self, model: PreTrainedModel):
         try:
@@ -452,8 +469,12 @@ class Perplexity(BaseMetric):
             reference_texts = [info["reference"] for info in meta_infos]
         else:
             reference_texts = [ref for refs in reference_texts for ref in refs]
-        tokenizer = AutoTokenizer.from_pretrained(self._tokenizer_id)
+        tokenizer = self._tokenizer
+        # tokenizer = AutoTokenizer.from_pretrained(self._tokenizer_id)
         encodings = tokenizer("\n\n".join(reference_texts), return_tensors="pt")
+
+        if self._model is not None:
+            model = self._model
 
         device = self.get_device(model)
 
