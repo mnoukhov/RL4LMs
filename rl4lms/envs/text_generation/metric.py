@@ -15,6 +15,7 @@ from transformers import (
     AutoModelForSequenceClassification,
     AutoTokenizer,
     PreTrainedModel,
+    PreTrainedTokenizer,
 )
 
 from rl4lms.data_pools.custom_text_generation_pools import DailyDialog
@@ -425,23 +426,13 @@ class Perplexity(BaseMetric):
         tokenizer_id: str,
         model_type: str = "causal",
         use_text_from_meta_data: bool = False,
-        model_name: str = None,
     ) -> None:
         super().__init__()
-        # self._tokenizer_id = tokenizer_id
+        self._tokenizer_id = tokenizer_id
         self._model_type = model_type
         self._stride = stride
         self._use_text_from_meta_data = use_text_from_meta_data
         self._device = "cuda" if torch.cuda.is_available() else "cpu"
-        if model_name is not None:
-            self._tokenizer = AutoTokenizer.from_pretrained(model_name)
-            # self._tokenizer.truncation_side = "left"
-            self._model = AutoModelForCausalLM.from_pretrained(model_name).to(
-                self._device
-            )
-        else:
-            self._tokenizer = AutoTokenizer.from_pretrained(tokenizer_id)
-            self._model = None
 
     def get_device(self, model: PreTrainedModel):
         try:
@@ -469,9 +460,24 @@ class Perplexity(BaseMetric):
             reference_texts = [info["reference"] for info in meta_infos]
         else:
             reference_texts = [ref for refs in reference_texts for ref in refs]
-        tokenizer = self._tokenizer
-        # tokenizer = AutoTokenizer.from_pretrained(self._tokenizer_id)
-        encodings = tokenizer("\n\n".join(reference_texts), return_tensors="pt")
+
+        tokenizer = AutoTokenizer.from_pretrained(self._tokenizer_id)
+        ppl = self.compute_ppl(reference_texts, model, tokenizer)
+
+        return {
+            "fluency_metrics/perplexity": (
+                None,
+                ppl.item(),
+            )
+        }
+
+    def compute_ppl(
+        self,
+        texts: List[str],
+        model: PreTrainedModel,
+        tokenizer: PreTrainedTokenizer,
+    ):
+        encodings = tokenizer("\n\n".join(texts), return_tensors="pt")
 
         if self._model is not None:
             model = self._model
@@ -496,10 +502,44 @@ class Perplexity(BaseMetric):
 
             nlls.append(neg_log_likelihood)
 
+        return torch.exp(torch.stack(nlls).sum() / end_loc)
+
+
+class LMPerplexity(Perplexity):
+    def __init__(
+        self,
+        stride: int,
+        model_name: str,
+    ) -> None:
+        super().__init__(
+            stride=stride,
+            tokenizer_id=None,
+            model_type="causal",
+            use_text_from_meta_data=False,
+        )
+        self._device = "cuda" if torch.cuda.is_available() else "cpu"
+        self._tokenizer = AutoTokenizer.from_pretrained(model_name)
+        # self._tokenizer.truncation_side = "left"
+        self._model = AutoModelForCausalLM.from_pretrained(model_name).to(self._device)
+
+    def compute(
+        self,
+        prompt_texts: List[str],
+        generated_texts: List[str],
+        reference_texts: List[List[str]],
+        meta_infos: List[Dict[str, Any]] = None,
+        model: PreTrainedModel = None,
+        split_name: str = None,
+    ) -> Tuple[List[float], float]:
+        if split_name == "train":
+            return {}
+
+        ppl = self.compute_ppl(generated_texts, self._model, self._tokenizer)
+
         return {
-            "fluency_metrics/perplexity": (
+            "fluency_metrics/lm_perplexity": (
                 None,
-                torch.exp(torch.stack(nlls).sum() / end_loc).item(),
+                ppl.item(),
             )
         }
 

@@ -13,13 +13,13 @@ from rl4lms.data_pools.custom_text_generation_pools import (
     CNNDailyMail,
     CommonGen,
     CRD3DialogueGeneration,
+    DailyDialog,
     IMDBForSeq2Seq,
     IWSLT2017EnDe,
     NarrativeQA,
     ToTTo,
     WMT14PreprocessedEnDe,
     WMT16NewsOnlyDatasetEnDe,
-    DailyDialog,
 )
 from rl4lms.data_pools.text_generation_pool import TextGenPool
 from rl4lms.envs.text_generation.alg_wrappers import wrap_onpolicy_alg
@@ -31,7 +31,9 @@ from rl4lms.envs.text_generation.metric import (
     BLEUToTTo,
     CIDERMetric,
     DiversityMetrics,
+    IntentAccuracyDailyDialog,
     LearnedRewardMetric,
+    LMPerplexity,
     MeteorMetric,
     ParentToTTo,
     Perplexity,
@@ -43,7 +45,6 @@ from rl4lms.envs.text_generation.metric import (
     SummaCZSMetric,
     TERMetric,
     chrFmetric,
-    IntentAccuracyDailyDialog,
 )
 from rl4lms.envs.text_generation.policy.base_policy import LMActorCriticPolicy
 from rl4lms.envs.text_generation.policy.causal_policy import (
@@ -51,10 +52,11 @@ from rl4lms.envs.text_generation.policy.causal_policy import (
     MaskedCausalLMActorCriticPolicy,
 )
 from rl4lms.envs.text_generation.policy.seq2seq_policy import (
-    Seq2SeqLMActorCriticPolicy,
     MaskedSeq2SeqLMActorCriticPolicy,
+    Seq2SeqLMActorCriticPolicy,
 )
 from rl4lms.envs.text_generation.post_processors import three_sentence_summary
+from rl4lms.envs.text_generation.preference_reward import CommonGenPrefRM
 from rl4lms.envs.text_generation.reward import (
     TER,
     BatchedCommonGenPenaltyShapingFunction,
@@ -62,6 +64,7 @@ from rl4lms.envs.text_generation.reward import (
     BLEURewardFunction,
     BLEURTRewardFunction,
     CommonGenPenaltyShapingFunction,
+    IntentAccuracy,
     LearnedRewardFunction,
     MeteorRewardFunction,
     PARENTRewardFunction,
@@ -72,9 +75,7 @@ from rl4lms.envs.text_generation.reward import (
     SacreBleu,
     SpiderRewardFunction,
     chrF,
-    IntentAccuracy,
 )
-from rl4lms.envs.text_generation.preference_reward import CommonGenPrefRM
 from rl4lms.envs.text_generation.test_datapool import TestTextGenPool
 from rl4lms.envs.text_generation.test_metric import DateInText, IncreasingNumbersinText
 from rl4lms.envs.text_generation.test_reward import (
@@ -159,6 +160,7 @@ class MetricRegistry:
         "summaCZS": SummaCZSMetric,
         "summaCConv": SummaCConvMetric,
         "causal_perplexity": Perplexity,
+        "lm_perplexity": LMPerplexity,
         "cider": CIDERMetric,
         "spice": SpiceMetric,
         "parent_totto": ParentToTTo,
