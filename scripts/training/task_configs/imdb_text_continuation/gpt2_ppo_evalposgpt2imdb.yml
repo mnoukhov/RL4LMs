@@ -55,9 +55,15 @@ train_evaluation:
         model_name: lvwerra/distilbert-imdb
         label_ix: 1
         batch_size: 100
+    - id: causal_perplexity
+      args:
+        tokenizer_id: gpt2
+        stride: 512
+        model_type: causal
     - id: lm_perplexity
       args:
         model_name: rajkumarrrk/gpt2-fine-tuned-on-imdb-positive-reviews
+        tokenizer_id: gpt2
         stride: 512
     - id: diversity
       args: {}

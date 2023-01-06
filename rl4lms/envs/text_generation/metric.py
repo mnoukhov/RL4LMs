@@ -479,9 +479,6 @@ class Perplexity(BaseMetric):
     ):
         encodings = tokenizer("\n\n".join(texts), return_tensors="pt")
 
-        if self._model is not None:
-            model = self._model
-
         device = self.get_device(model)
 
         nlls = []
@@ -510,15 +507,18 @@ class LMPerplexity(Perplexity):
         self,
         stride: int,
         model_name: str,
+        tokenizer_id: str,
     ) -> None:
         super().__init__(
             stride=stride,
-            tokenizer_id=None,
+            tokenizer_id=tokenizer_id,
             model_type="causal",
             use_text_from_meta_data=False,
         )
         self._device = "cuda" if torch.cuda.is_available() else "cpu"
-        self._tokenizer = AutoTokenizer.from_pretrained(model_name)
+        # I don't know why tokenizer_id is necessary here but HF errors
+        # when using the imdb gpt2 model name
+        self._tokenizer = AutoTokenizer.from_pretrained(tokenizer_id)
         # self._tokenizer.truncation_side = "left"
         self._model = AutoModelForCausalLM.from_pretrained(model_name).to(self._device)
 
@@ -784,6 +784,12 @@ if __name__ == "__main__":
     prompt_texts = [""]
     gen_texts = ["Hello there general kenobi", "foo bar foobar"]
     reference_texts = [["Hello there general kenobi"], ["foo bar foobar"]]
+
+    # metric = LMPerplexity(
+    #     512, "rajkumarrrk/gpt2-fine-tuned-on-imdb-positive-reviews", "gpt2"
+    # )
+    # metric.compute(prompt_texts, gen_texts, reference_texts)
+
     # metric = MeteorMetric()
     # print(metric.compute(prompt_texts, gen_texts, reference_texts))
 
@@ -822,17 +828,17 @@ if __name__ == "__main__":
     # metric = SummaCConvMetric(granularity="sentence")
     # print(metric.compute([document], [summary], []))
 
-    prompt_texts = ["1", "2"]
-    gen_texts = [
-        "The dog is the boy's cat.",
-        "A boy is picking apples from trees and put them into bags.",
-    ]
-    reference_texts = [
-        ["The dog is the boy's cat.", "The dog eats the cat of the boy."],
-        ["A boy is picking apples from trees."],
-    ]
-    metric = CIDERMetric()
-    print(metric.compute(prompt_texts, gen_texts, reference_texts))
+    # prompt_texts = ["1", "2"]
+    # gen_texts = [
+    #     "The dog is the boy's cat.",
+    #     "A boy is picking apples from trees and put them into bags.",
+    # ]
+    # reference_texts = [
+    #     ["The dog is the boy's cat.", "The dog eats the cat of the boy."],
+    #     ["A boy is picking apples from trees."],
+    # ]
+    # metric = CIDERMetric()
+    # print(metric.compute(prompt_texts, gen_texts, reference_texts))
 
-    metric = SpiceMetric()
-    print(metric.compute(prompt_texts, gen_texts, reference_texts))
+    # metric = SpiceMetric()
+    # print(metric.compute(prompt_texts, gen_texts, reference_texts))
