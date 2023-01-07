@@ -50,11 +50,6 @@ train_evaluation:
   eval_every: 10
   save_every: 1
   metrics:
-    - id: lm_perplexity
-      args:
-        model_name: lvwerra/gpt2-imdb
-        tokenizer_id: gpt2
-        stride: 512
     - id: learned_reward
       args: 
         model_name: lvwerra/distilbert-imdb
@@ -65,5 +60,10 @@ train_evaluation:
         tokenizer_id: gpt2
         stride: 512
         model_type: causal
+    - id: lm_perplexity
+      args:
+        model_name: gpt2-medium
+        tokenizer_id: gpt2-medium
+        stride: 512
     - id: diversity
       args: {}
