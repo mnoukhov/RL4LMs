@@ -483,10 +483,17 @@ class Perplexity(BaseMetric):
 
         nlls = []
         max_length = model.config.n_positions
-        for i in tqdm(range(0, encodings.input_ids.size(1), self._stride)):
-            begin_loc = max(i + self._stride - max_length, 0)
-            end_loc = min(i + self._stride, encodings.input_ids.size(1))
-            trg_len = end_loc - i  # may be different from stride on last loop
+        seq_len = encodings.input_ids.size(1)
+        assert self._stride <= max_length, (
+            "Your PPL stride is larger than model's max length "
+            " and therefore is not capturing some part of the input"
+        )
+
+        prev_end_loc = 0
+        for begin_loc in tqdm(range(0, seq_len, self._stride)):
+            end_loc = min(begin_loc + max_length, seq_len)
+            # since trg_len may be different from stride on last loop
+            trg_len = end_loc - prev_end_loc
 
             # run on last device
             input_ids = encodings.input_ids[:, begin_loc:end_loc].to(device)
@@ -495,9 +502,13 @@ class Perplexity(BaseMetric):
 
             with torch.no_grad():
                 outputs = model(input_ids, labels=target_ids)
-                neg_log_likelihood = outputs[0] * trg_len
+                neg_log_likelihood = outputs.loss * trg_len
 
             nlls.append(neg_log_likelihood)
+
+            prev_end_loc = end_loc
+            if end_loc == seq_len:
+                break
 
         return torch.exp(torch.stack(nlls).sum() / end_loc)
 
@@ -534,7 +545,12 @@ class LMPerplexity(Perplexity):
         if split_name == "train":
             return {}
 
-        ppl = self.compute_ppl(generated_texts, self._model, self._tokenizer)
+        # combine prompt and generated text so the PPL for the generation
+        # is calulcated with the prompt as context
+        total_texts = [
+            prompt + gen for prompt, gen in zip(prompt_texts, generated_texts)
+        ]
+        ppl = self.compute_ppl(total_texts, self._model, self._tokenizer)
 
         return {
             "fluency_metrics/lm_perplexity": (
@@ -785,10 +801,12 @@ if __name__ == "__main__":
     gen_texts = ["Hello there general kenobi", "foo bar foobar"]
     reference_texts = [["Hello there general kenobi"], ["foo bar foobar"]]
 
-    # metric = LMPerplexity(
-    #     512, "rajkumarrrk/gpt2-fine-tuned-on-imdb-positive-reviews", "gpt2"
-    # )
-    # metric.compute(prompt_texts, gen_texts, reference_texts)
+    metric = LMPerplexity(
+        512,
+        "gpt2-medium",
+        "gpt2-medium",
+    )
+    metric.compute(prompt_texts, gen_texts, reference_texts)
 
     # metric = MeteorMetric()
     # print(metric.compute(prompt_texts, gen_texts, reference_texts))
