@@ -1,15 +1,17 @@
-from rl4lms.data_pools.text_generation_pool import TextGenPool, Sample
-from rl4lms.data_pools.task_utils.totto import preprocess_utils
-from datasets import load_dataset
-from tqdm import tqdm
-from nltk.tokenize import word_tokenize
-import os
-from urllib.request import urlretrieve
-from pathlib import Path
-import pandas
-from collections import defaultdict
-import zipfile
 import json
+import os
+import zipfile
+from collections import defaultdict
+from pathlib import Path
+from urllib.request import urlretrieve
+
+import pandas
+from datasets import load_dataset
+from nltk.tokenize import word_tokenize
+from tqdm import tqdm
+
+from rl4lms.data_pools.task_utils.totto import preprocess_utils
+from rl4lms.data_pools.text_generation_pool import Sample, TextGenPool
 
 
 class ToTTo(TextGenPool):
@@ -223,16 +225,18 @@ class IMDB(TextGenPool):
             dataset_split = dataset_split[:5000]
 
         samples = []
-        for ix, text in enumerate(dataset_split["text"]):
+        for ix, (text, label) in enumerate(zip(dataset_split["text"], dataset_split["label"])):
 
             # here we consider 50% of tokens as prompt
             prompt_text = text.split(" ")
             prompt_text = " ".join(prompt_text[:int(len(prompt_text) * 0.5)])
 
+            meta_data = { 'label': label } if split != 'train' else None
+
             sample = Sample(id=f"{split}_{ix}",
                             prompt_or_input_text=prompt_text,
-                            references=[text]
-                            )
+                            references=[text],
+                            meta_data=meta_data)
             samples.append(sample)
         pool_instance = cls(samples)
         return pool_instance
@@ -583,8 +587,8 @@ class DailyDialog(TextGenPool):
 
 
 if __name__ == "__main__":
-    from transformers import AutoTokenizer
     import numpy as np
+    from transformers import AutoTokenizer
     dp = DailyDialog.prepare("val", 5)
     print(dp[0])
     

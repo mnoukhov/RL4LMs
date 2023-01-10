@@ -552,10 +552,18 @@ class LMPerplexity(Perplexity):
         ]
         ppl = self.compute_ppl(total_texts, self._model, self._tokenizer)
 
+        pos_texts = [
+            text for text,meta in zip(total_texts, meta_infos) if meta['label'] == 1
+        ]
+        pos_ppl = self.compute_ppl(pos_texts, self._model, self._tokenizer)
         return {
             "fluency_metrics/lm_perplexity": (
                 None,
                 ppl.item(),
+            ),
+            "fluency_metrics/lm_pos_perplexity": (
+                None,
+                pos_ppl.item(),
             )
         }
 
