@@ -54,7 +54,7 @@ train_evaluation:
       args:
         model_name: lvwerra/gpt2-imdb
         tokenizer_id: gpt2
-        stride: 512
+        batch_size: 100
     - id: learned_reward
       args: 
         model_name: lvwerra/distilbert-imdb

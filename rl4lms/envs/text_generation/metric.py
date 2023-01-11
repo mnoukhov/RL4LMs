@@ -514,24 +514,36 @@ class Perplexity(BaseMetric):
 
 
 class LMPerplexity(Perplexity):
+    """Language Model Perplexity
+
+    ppl of generated output under a pretrained language model
+
+    get the PPL of just the generated output using the prompt as context but don't count it for PPL
+    since all our generated output is only 50 tokens max, we don't need to do any striding or stuff
+    instead, do everything in batches and take average PPL across batches
+    
+    """
     def __init__(
         self,
-        stride: int,
+        batch_size: int,
         model_name: str,
         tokenizer_id: str,
     ) -> None:
         super().__init__(
-            stride=stride,
+            stride=None,
             tokenizer_id=tokenizer_id,
             model_type="causal",
             use_text_from_meta_data=False,
         )
-        self._device = "cuda" if torch.cuda.is_available() else "cpu"
         # I don't know why tokenizer_id is necessary here but HF errors
         # when using the imdb gpt2 model name
         self._tokenizer = AutoTokenizer.from_pretrained(tokenizer_id)
+        self._tokenizer.truncation_side = "left" 
+        if self._tokenizer.pad_token is None:
+            self._tokenizer.pad_token = self._tokenizer.eos_token
         # self._tokenizer.truncation_side = "left"
         self._model = AutoModelForCausalLM.from_pretrained(model_name).to(self._device)
+        self._batch_size = batch_size
 
     def compute(
         self,
@@ -545,27 +557,70 @@ class LMPerplexity(Perplexity):
         if split_name == "train":
             return {}
 
+        generated_lengths = [len(gen) for gen in generated_texts]
         # combine prompt and generated text so the PPL for the generation
         # is calulcated with the prompt as context
         total_texts = [
             prompt + gen for prompt, gen in zip(prompt_texts, generated_texts)
         ]
-        ppl = self.compute_ppl(total_texts, self._model, self._tokenizer)
+        ppl = self.compute_ppl(total_texts, self._model, self._tokenizer, generated_lengths)
 
-        pos_texts = [
-            text for text,meta in zip(total_texts, meta_infos) if meta['label'] == 1
-        ]
-        pos_ppl = self.compute_ppl(pos_texts, self._model, self._tokenizer)
-        return {
+        metric_dict = {
             "fluency_metrics/lm_perplexity": (
                 None,
                 ppl.item(),
             ),
-            "fluency_metrics/lm_pos_perplexity": (
+        }
+
+        if meta_infos is not None:
+            pos_texts = [
+                text for text,meta in zip(total_texts, meta_infos) if meta['label'] == 1
+            ]
+            pos_ppl = self.compute_ppl(pos_texts, self._model, self._tokenizer, generated_lengths)
+            
+            metric_dict["fluency_metrics/lm_pos_perplexity"] = (
                 None,
                 pos_ppl.item(),
             )
-        }
+
+        return metric_dict
+
+    def compute_ppl(
+        self,
+        texts: List[str],
+        model: PreTrainedModel,
+        tokenizer: PreTrainedTokenizer,
+        gen_lengths: List[int],
+    ):
+        nlls = []
+        encodings = tokenizer(
+            texts, return_tensors="pt", truncation=True, 
+            padding=True, return_length=True,
+        )
+
+        for start_ix in range(0, len(texts), self._batch_size): 
+            end_ix = min(start_ix + self._batch_size, len(texts))
+            
+            batch_texts = texts[start_ix: end_ix]
+            batch_gen_lengths = gen_lengths[start_ix:end_ix]
+
+            # run on lm device
+            input_ids = encodings.input_ids.to(self._device)
+            # only get targets for generated tokens, skip everything else (-100)
+            target_ids = torch.full_like(input_ids, -100)
+            for i, (input_length, gen_length) in enumerate(zip(encodings.length, batch_gen_lengths)):
+                gen_start = input_length - gen_length 
+                target_ids[i][gen_start: input_length] = input_ids[i][gen_start: input_length].clone()
+
+            with torch.no_grad():
+                outputs = model(input_ids, labels=target_ids)
+                # multiply by number of tokens to get summation instead of average
+                neg_log_likelihood = outputs.loss * sum(batch_gen_lengths)
+
+            nlls.append(neg_log_likelihood)
+        
+        return torch.exp(torch.stack(nlls).sum() / sum(gen_lengths))
+
 
 
 class ParentToTTo:
@@ -805,7 +860,7 @@ class IntentAccuracyDailyDialog(BaseMetric):
 
 
 if __name__ == "__main__":
-    prompt_texts = [""]
+    prompt_texts = ["A surprise to be sure","spam spam eggs"]
     gen_texts = ["Hello there general kenobi", "foo bar foobar"]
     reference_texts = [["Hello there general kenobi"], ["foo bar foobar"]]
 
@@ -814,7 +869,7 @@ if __name__ == "__main__":
         "gpt2-medium",
         "gpt2-medium",
     )
-    metric.compute(prompt_texts, gen_texts, reference_texts)
+    print(metric.compute(prompt_texts, gen_texts, reference_texts))
 
     # metric = MeteorMetric()
     # print(metric.compute(prompt_texts, gen_texts, reference_texts))
