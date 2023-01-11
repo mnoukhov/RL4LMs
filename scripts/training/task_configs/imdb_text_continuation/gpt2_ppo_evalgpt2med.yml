@@ -64,6 +64,6 @@ train_evaluation:
       args:
         model_name: gpt2-medium
         tokenizer_id: gpt2-medium
-        stride: 512
+        batch_size: 16
     - id: diversity
       args: {}
