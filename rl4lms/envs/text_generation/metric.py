@@ -425,12 +425,14 @@ class Perplexity(BaseMetric):
         stride: int,
         tokenizer_id: str,
         model_type: str = "causal",
+        compute_pos: bool = False,
         use_text_from_meta_data: bool = False,
     ) -> None:
         super().__init__()
         self._tokenizer_id = tokenizer_id
         self._model_type = model_type
         self._stride = stride
+        self._compute_pos = compute_pos
         self._use_text_from_meta_data = use_text_from_meta_data
 
     def get_device(self, model: PreTrainedModel):
@@ -463,12 +465,28 @@ class Perplexity(BaseMetric):
         tokenizer = AutoTokenizer.from_pretrained(self._tokenizer_id)
         ppl = self.compute_ppl(reference_texts, model, tokenizer)
 
-        return {
+        metric_dict = {
             "fluency_metrics/perplexity": (
                 None,
                 ppl.item(),
             )
         }
+
+        if meta_infos is not None and self._compute_pos:
+            pos_texts = [
+                text
+                for text, meta in zip(reference_texts, meta_infos)
+                if meta["label"] == 1
+            ]
+
+            pos_ppl = self.compute_ppl(pos_texts, model, tokenizer)
+
+            metric_dict["fluency_metrics/pos_perplexity"] = (
+                None,
+                pos_ppl.item(),
+            )
+
+        return metric_dict
 
     def compute_ppl(
         self,
@@ -528,6 +546,7 @@ class LMPerplexity(BaseMetric):
         batch_size: int,
         model_name: str,
         tokenizer_id: str,
+        compute_pos: bool = False,
     ) -> None:
         super().__init__()
         self._batch_size = batch_size
@@ -540,6 +559,7 @@ class LMPerplexity(BaseMetric):
             self._tokenizer.pad_token = self._tokenizer.eos_token
         # self._tokenizer.truncation_side = "left"
         self._model = AutoModelForCausalLM.from_pretrained(model_name).to(self._device)
+        self._compute_pos = compute_pos
 
     def compute(
         self,
@@ -569,7 +589,7 @@ class LMPerplexity(BaseMetric):
             ),
         }
 
-        if meta_infos is not None:
+        if meta_infos is not None and self._compute_pos:
             pos_texts, pos_gen_texts = [], []
             for text, meta, gen_text in zip(total_texts, meta_infos, generated_texts):
                 if meta["label"] == 1:
@@ -882,17 +902,26 @@ class IntentAccuracyDailyDialog(BaseMetric):
 
 
 if __name__ == "__main__":
-    # prompt_texts = ["A surprise to be sure", "spam spam eggs"]
-    prompt_texts = ["If it isn't General Kenobi.", "Foo"]
+    # prompt_texts = ["If it isn't General Kenobi.", "Foo"]
+    prompt_texts = ["", ""]
     gen_texts = [" Hello there general kenobi", " foo bar foobar"]
     reference_texts = [[" Hello there general kenobi"], [" foo bar foobar"]]
 
-    metric = LMPerplexity(
-        64,
+    meta_infos = [{"label": 0}, {"label": 1}]
+    metric = Perplexity(
+        512,
         "gpt2",
-        "gpt2",
+        "causal",
     )
-    print(metric.compute(prompt_texts, gen_texts, reference_texts))
+    model = AutoModelForCausalLM.from_pretrained("gpt2").to("cuda")
+    print(metric.compute(prompt_texts, gen_texts, reference_texts, meta_infos, model))
+
+    # metric = LMPerplexity(
+    #     64,
+    #     "gpt2",
+    #     "gpt2",
+    # )
+    # print(metric.compute(prompt_texts, gen_texts, reference_texts))
 
     # metric = MeteorMetric()
     # print(metric.compute(prompt_texts, gen_texts, reference_texts))
