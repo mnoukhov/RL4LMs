@@ -30,7 +30,7 @@ alg:
     verbose: 1
     learning_rate: 0.000001
     n_epochs: 5
-    ema_decay: 1.0
+    ema_decay: 0.999
     
   kl_div:
     coeff: 0.1
@@ -38,7 +38,7 @@ alg:
   policy:
     id: causal_lm_actor_critic_policy
     args:
-      model_name: sshleifer/tiny-gpt2
+      model_name: lvwerra/gpt2-imdb
       apply_model_parallel: True
       generation_kwargs:
         do_sample: True
@@ -46,7 +46,6 @@ alg:
         max_new_tokens: 48
       
 train_evaluation:
-  eval_before_train: False
   eval_batch_size: 256
   n_iters: 100
   eval_every: 10
