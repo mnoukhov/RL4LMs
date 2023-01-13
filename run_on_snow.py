@@ -1,7 +1,9 @@
 import argparse
+import copy
 import os
 
 import yaml
+from haven import haven_utils as hu
 from haven import haven_wizard as hw
 
 from scripts.training.train_text_generation import main
@@ -58,11 +60,22 @@ if __name__ == "__main__":
     parser.add_argument(
         "--no-wandb", action="store_true", help="disable wandb", default=False
     )
+    parser.add_argument("--seeds", type=int, default=1)
     # parser.add_argument(
     #     "--exp-id", default=None, help="id used to resume an experiment"
     # )
 
     args, _ = parser.parse_known_args()
+
+    # 1 config yaml per experiment
+    with open(args.exp_group, "r") as fp:
+        exp_dict = yaml.safe_load(fp)
+
+    exp_list = []
+    for seed in range(args.seeds):
+        seed_exp_dict = copy.deepcopy(exp_dict)
+        seed_exp_dict["alg"]["args"]["seed"] = seed
+        exp_list.append(seed_exp_dict)
 
     if args.job_scheduler == "toolkit":
         with open("/home/toolkit/wandb_api_key", "r") as f:
@@ -82,11 +95,12 @@ if __name__ == "__main__":
                 "HOME=/home/toolkit",
                 f"HF_HOME=/home/toolkit/huggingface/",
                 f"WANDB_API_KEY={wandb_api_key}",
+                f"WANDB_RUN_GROUP={hu.hash_dict(exp_dict)}",
             ],
             "restartable": True,
             "resources": {
                 "cpu": 4 * args.gpus,
-                "mem": 16 * args.gpus,
+                "mem": 48 * args.gpus,
                 "gpu_mem": 80,
                 "gpu": args.gpus,
                 "gpu_model": "A100",
@@ -99,14 +113,10 @@ if __name__ == "__main__":
         job_config = None
         job_scheduler = None
 
-    # For now use 1 config yaml per experiment
-    with open(args.exp_group, "r") as fp:
-        exp_dict = yaml.safe_load(fp)
-
     # Run experiments and create results file
     hw.run_wizard(
         func=run_exp,
-        exp_list=[exp_dict],
+        exp_list=exp_list,
         savedir_base=args.savedir_base,
         reset=args.reset,
         job_config=job_config,
