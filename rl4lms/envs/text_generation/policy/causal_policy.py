@@ -73,6 +73,8 @@ class CausalLMActorCriticPolicy(LMActorCriticPolicy, ActorCriticWarmStartMixin):
 
         self._value_model = AutoModelForCausalLM.from_pretrained(model_name)
         self._ref_model = deepcopy(self._policy_model).eval()
+        for param in self._ref_model.parameters():
+            param.requires_grad = False
 
         self._value_head = nn.Linear(
             self._value_model.config.hidden_size, 1, bias=False
@@ -277,7 +279,7 @@ class CausalLMActorCriticPolicy(LMActorCriticPolicy, ActorCriticWarmStartMixin):
             return self
         else:
             return super().to(device)
-        
+
     def get_distribution(self, obs: TensorDict, detach=False):
         input_ids = obs["input_encoded_pt"].int()
         attention_mask = obs["input_attention_mask_pt"]
@@ -296,20 +298,20 @@ class CausalLMActorCriticPolicy(LMActorCriticPolicy, ActorCriticWarmStartMixin):
                 output = self._policy_model(output_hidden_states=True, **model_inputs)
         else:
             model_inputs = self._prepare_inputs_for_model(
-                    self._policy_model, input_ids, past_model_kwargs
-                )
+                self._policy_model, input_ids, past_model_kwargs
+            )
 
             # forward pass to transformers
             output = self._policy_model(output_hidden_states=True, **model_inputs)
-
 
         # compute action probs - policy head
         next_token_logits = output.logits[:, -1, :]
         dist = self._action_dist.proba_distribution(action_logits=next_token_logits)
         return dist
-    
+
     def predict_values(self, obs: TensorDict):
         return self.forward_value(obs).values
+
 
 class MaskedCausalLMActorCriticPolicy(
     CausalLMActorCriticPolicy, MaskableActorCriticWarmStartMixin

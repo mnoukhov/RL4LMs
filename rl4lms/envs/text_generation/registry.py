@@ -4,6 +4,7 @@ from stable_baselines3.common.off_policy_algorithm import OffPolicyAlgorithm
 from stable_baselines3.common.on_policy_algorithm import OnPolicyAlgorithm
 
 from rl4lms.algorithms.a2c.a2c import A2C
+from rl4lms.algorithms.ema.ema_ppo import EMAPPO
 from rl4lms.algorithms.nlpo import NLPO
 from rl4lms.algorithms.ppo.ppo import PPO
 from rl4lms.algorithms.trpo import TRPO
@@ -204,6 +205,7 @@ class PolicyRegistry:
 class AlgorithmRegistry:
     _registry = {
         "nlpo": NLPO,
+        "emappo": EMAPPO,
         "trpo": TRPO,
         "ppo": PPO,
         "a2c": A2C,
@@ -229,6 +231,7 @@ class AlgorithmRegistry:
 class WrapperRegistry:
     _registry = {
         "nlpo": wrap_onpolicy_alg,
+        "emappo": wrap_onpolicy_alg,
         "trpo": wrap_onpolicy_alg,
         "ppo": wrap_onpolicy_alg,
         "a2c": wrap_onpolicy_alg,
