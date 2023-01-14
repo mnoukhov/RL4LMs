@@ -132,6 +132,7 @@ class LMActorCriticPolicy(BasePolicy):
         super().__init__(observation_space, action_space)
         self._action_space = action_space
         self._apply_model_parallel = apply_model_parallel
+        self._model_name = model_name
         self._build_model_heads(model_name)
         self._setup_optimizer(optimizer_kwargs, weight_decay, optimizer_class)
         self._action_dist = CategoricalDistribution(self._action_space.n)

@@ -1,3 +1,4 @@
+import logging
 from functools import partial
 from typing import Any, Dict, List
 
@@ -229,7 +230,7 @@ class OnPolicyTrainer(TrainerWarmStartMixin):
             self._trainer_state["current_iter"] = epoch
 
             # inner rollout and learn loop for on-policy algorithm
-            self._alg.learn(self._n_steps_per_iter)
+            self._alg.learn(self._n_steps_per_iter, epoch=epoch)
 
             # save the policy checkpoint
             if (epoch + 1) % self._train_eval_config.get("save_every", 20) == 0:
