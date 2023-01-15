@@ -141,13 +141,12 @@ class EMAPPO(PPO):
 
             if self.reset_ema:
                 logger.info("resetting ema to pretrained")
-                self.policy._ref_model = AutoModelForCausalLM.from_pretrained(
+                pretrained_model = AutoModelForCausalLM.from_pretrained(
                     self.policy._model_name
                 )
-                self.policy._ref_model.__class__ = override_generation_routines(
-                    type(self.policy._ref_model)
+                self.policy._ref_model.load_state_dict(
+                    pretrained_model.state_dict(), strict=False
                 )
-
         return self
 
     @th.no_grad()
