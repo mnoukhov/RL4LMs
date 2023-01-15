@@ -133,7 +133,7 @@ class EMAPPO(PPO):
 
         self.ema_update_ref_model()
 
-        if epoch % self.reset_epochs == 0:
+        if self.reset_epochs is not None and epoch % self.reset_epochs == 0:
             self.policy._policy_model.load_state_dict(
                 self.policy._ref_model.state_dict(), strict=False
             )
