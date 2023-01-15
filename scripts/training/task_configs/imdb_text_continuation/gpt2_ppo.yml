@@ -38,7 +38,7 @@ alg:
     id: causal_lm_actor_critic_policy
     args:
       model_name: lvwerra/gpt2-imdb
-      apply_model_parallel: True
+      apply_model_parallel: False
       generation_kwargs:
         do_sample: True
         min_length: 48
