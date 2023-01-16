@@ -3,10 +3,11 @@ from typing import Any, Dict, List
 from stable_baselines3.common.policies import BasePolicy
 from tqdm import tqdm
 from transformers import AutoTokenizer
+from transformers.modeling_utils import unwrap_model
 
 from rl4lms.data_pools.custom_text_generation_pools import Sample
 from rl4lms.envs.text_generation.logging_utils import Tracker
-from rl4lms.envs.text_generation.metric import BaseMetric
+from rl4lms.envs.text_generation.metric import BaseMetric, Perplexity
 
 
 def get_batch(samples: List[Sample], batch_size: int):
@@ -30,8 +31,10 @@ def evaluate_on_samples(
     tracker: Tracker = None,
     dt_control_token: str = "",
     gen_kwargs: Dict[str, Any] = None,
+    ref_causal_perplexity: bool = False,
 ):
     # generate text by batch
+    all_generated_ref_texts = []
     all_generated_texts = []
     all_ref_texts = []
     all_prompt_texts = []
@@ -62,6 +65,23 @@ def evaluate_on_samples(
                 policy.get_language_model(),
                 split_name,
             )
+
+            # do perplexity with the reference model and rename keys
+            if isinstance(metric, Perplexity) and ref_causal_perplexity:
+                ref_metric_dict = metric.compute(
+                    all_prompt_texts,
+                    all_generated_texts,
+                    all_ref_texts,
+                    all_meta_infos,
+                    unwrap_model(policy._ref_model),
+                    split_name,
+                )
+                ref_metric_dict_renamed = {
+                    key.replace("perplexity", "ref_perplexity"): value
+                    for key, value in ref_metric_dict.items()
+                }
+
+                metric_dict.update(ref_metric_dict_renamed)
 
             for metric_key, (sample_scores, corpus_score) in metric_dict.items():
                 if sample_scores is None:
@@ -109,6 +129,23 @@ def generate_text(
         dt_control_token + sample.prompt_or_input_text for sample in samples
     ]
     generated_texts = policy.generate(
+        tokenizer, prompt_texts, max_prompt_length, gen_kwargs=gen_kwargs
+    ).gen_texts
+    return generated_texts
+
+
+def ref_generate_text(
+    policy: BasePolicy,
+    tokenizer: AutoTokenizer,
+    samples: List[Sample],
+    max_prompt_length: int,
+    dt_control_token: str,
+    gen_kwargs: Dict[str, Any],
+):
+    prompt_texts = [
+        dt_control_token + sample.prompt_or_input_text for sample in samples
+    ]
+    generated_texts = policy.ref_generate(
         tokenizer, prompt_texts, max_prompt_length, gen_kwargs=gen_kwargs
     ).gen_texts
     return generated_texts
