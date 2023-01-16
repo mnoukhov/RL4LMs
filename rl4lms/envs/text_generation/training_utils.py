@@ -40,6 +40,8 @@ from rl4lms.envs.text_generation.utils_supervised import (
 )
 from rl4lms.envs.text_generation.warm_start import TrainerWarmStartMixin
 
+logger = logging.getLogger(__name__)
+
 
 def build_tokenizer(tokenizer_config: Dict[str, Any]):
     tokenizer = AutoTokenizer.from_pretrained(tokenizer_config["model_name"])
@@ -203,6 +205,11 @@ class OnPolicyTrainer(TrainerWarmStartMixin):
 
         self.eval_before_train = self._train_eval_config.get("eval_before_train", True)
 
+        # resetting
+        _reset_freq = self._train_eval_config.get("reset_freq", None)
+        self._reset_freq = None if _reset_freq is None else int(_reset_freq)
+        self._reset_ema = bool(self._train_eval_config.get("reset_ema", False))
+
     def _evaluate_on_datapools(self, epoch: int, splits: List[str] = ["val", "test"]):
         for split in splits:
             evaluate_on_samples(
@@ -230,7 +237,22 @@ class OnPolicyTrainer(TrainerWarmStartMixin):
             self._trainer_state["current_iter"] = epoch
 
             # inner rollout and learn loop for on-policy algorithm
-            self._alg.learn(self._n_steps_per_iter, epoch=epoch)
+            self._alg.learn(self._n_steps_per_iter)
+
+            if self._reset_freq is not None and epoch % self._reset_freq == 0:
+                self._alg.policy._policy_model.load_state_dict(
+                    self._alg.policy._ref_model.state_dict(), strict=False
+                )
+                logger.info("resetting policy to ref")
+
+                if self._reset_ema:
+                    logger.info("resetting ema to pretrained")
+                    pretrained_model = AutoModelForCausalLM.from_pretrained(
+                        self._alg.policy._model_name
+                    )
+                    self._alg.policy._ref_model.load_state_dict(
+                        pretrained_model.state_dict(), strict=False
+                    )
 
             # save the policy checkpoint
             if (epoch + 1) % self._train_eval_config.get("save_every", 20) == 0:

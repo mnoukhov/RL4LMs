@@ -61,10 +61,5 @@ train_evaluation:
         tokenizer_id: gpt2
         stride: 512
         model_type: causal
-    - id: lm_perplexity
-      args:
-        model_name: lvwerra/gpt2-imdb
-        tokenizer_id: gpt2
-        batch_size: 16
     - id: diversity
       args: {}

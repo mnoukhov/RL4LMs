@@ -31,7 +31,6 @@ alg:
     learning_rate: 0.000001
     n_epochs: 5
     ema_decay: 0.99
-    reset_epochs: 30
     
   kl_div:
     coeff: 0.1
@@ -47,6 +46,7 @@ alg:
         max_new_tokens: 48
       
 train_evaluation:
+  reset_freq: 30
   eval_batch_size: 256
   n_iters: 100
   eval_every: 10
@@ -62,10 +62,5 @@ train_evaluation:
         tokenizer_id: gpt2
         stride: 512
         model_type: causal
-    - id: lm_perplexity
-      args:
-        model_name: lvwerra/gpt2-imdb
-        tokenizer_id: gpt2
-        batch_size: 16
     - id: diversity
       args: {}

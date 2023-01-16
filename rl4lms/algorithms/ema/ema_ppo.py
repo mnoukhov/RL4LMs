@@ -1,4 +1,3 @@
-import logging
 import warnings
 from copy import deepcopy
 from typing import Any, Dict, Optional, Type, Union
@@ -22,8 +21,6 @@ from rl4lms.algorithms.ppo.ppo import PPO
 from rl4lms.envs.text_generation.hf_generation_utils import override_generation_routines
 from rl4lms.envs.text_generation.logging_utils import Tracker
 from rl4lms.envs.text_generation.policy.base_policy import EvaluateActionsOutput
-
-logger = logging.getLogger(__name__)
 
 
 class EMAPPO(PPO):
@@ -68,8 +65,6 @@ class EMAPPO(PPO):
         device: Union[th.device, str] = "auto",
         _init_setup_model: bool = True,
         ema_decay: float = 0.999,
-        reset_epochs: int = None,
-        reset_ema: bool = False,
     ):
 
         super().__init__(
@@ -101,13 +96,10 @@ class EMAPPO(PPO):
         )
 
         self.ema_decay = ema_decay
-        self.reset_epochs = reset_epochs
-        self.reset_ema = reset_ema
 
     def learn(
         self,
         total_timesteps: int,
-        epoch: int,
         callback: MaybeCallback = None,
         log_interval: int = 1,
         eval_env: Optional[GymEnv] = None,
@@ -120,7 +112,6 @@ class EMAPPO(PPO):
 
         super().learn(
             total_timesteps=total_timesteps,
-            epoch=epoch,
             callback=callback,
             log_interval=log_interval,
             eval_env=eval_env,
@@ -133,20 +124,6 @@ class EMAPPO(PPO):
 
         self.ema_update_ref_model()
 
-        if self.reset_epochs is not None and epoch % self.reset_epochs == 0:
-            self.policy._policy_model.load_state_dict(
-                self.policy._ref_model.state_dict(), strict=False
-            )
-            logger.info("resetting policy to ref")
-
-            if self.reset_ema:
-                logger.info("resetting ema to pretrained")
-                pretrained_model = AutoModelForCausalLM.from_pretrained(
-                    self.policy._model_name
-                )
-                self.policy._ref_model.load_state_dict(
-                    pretrained_model.state_dict(), strict=False
-                )
         return self
 
     @th.no_grad()
