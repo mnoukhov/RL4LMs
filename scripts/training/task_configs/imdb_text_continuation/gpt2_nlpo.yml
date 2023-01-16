@@ -38,7 +38,7 @@ alg:
     id: maskable_causal_lm_actor_critic_policy
     args:
       model_name: lvwerra/gpt2-imdb
-      apply_model_parallel: True
+      apply_model_parallel: False
       top_mask: 0.9
       min_tokens_to_keep: 100
       mask_type: 'learned_top_p'
