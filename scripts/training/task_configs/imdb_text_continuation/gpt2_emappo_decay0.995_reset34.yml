@@ -39,14 +39,15 @@ alg:
     id: causal_lm_actor_critic_policy
     args:
       model_name: lvwerra/gpt2-imdb
-      apply_model_parallel: False
+      apply_model_parallel: True
       generation_kwargs:
         do_sample: True
         min_length: 48
         max_new_tokens: 48
       
 train_evaluation:
-  reset_freq: 30
+  ref_causal_perplexity: True
+  reset_freq: 34
   eval_batch_size: 256
   n_iters: 100
   eval_every: 10
