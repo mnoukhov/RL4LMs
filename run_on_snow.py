@@ -10,6 +10,9 @@ from scripts.training.train_text_generation import main
 
 
 def run_exp(exp_dict, savedir, args):
+    if not args.no_wandb:
+        os.environ['WANDB_RUN_ID'] = os.path.basename(savedir)
+
     main(
         config_path=args.exp_group,
         project_name="rl4lms",
@@ -96,6 +99,7 @@ if __name__ == "__main__":
                 f"HF_HOME=/home/toolkit/huggingface/",
                 f"WANDB_API_KEY={wandb_api_key}",
                 f"WANDB_RUN_GROUP={hu.hash_dict(exp_dict)}",
+                f"WANDB_RESUME=allow",
             ],
             "restartable": True,
             "resources": {
