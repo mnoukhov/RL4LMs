@@ -1,21 +1,32 @@
+from copy import deepcopy
 from enum import Enum
-from typing import Any, Dict, Optional, Tuple, List, Union
+from typing import Any, Dict, List, Optional, Tuple, Union
+
 import torch
 from gym.spaces import Discrete
 from gym.spaces.dict import Dict as DictSpace
-from stable_baselines3.common.policies import BasePolicy
-from stable_baselines3.common.type_aliases import Schedule
-from torch import nn
-from transformers import AutoModelForCausalLM, AutoTokenizer, AutoModelForSeq2SeqLM
 from stable_baselines3.common.distributions import CategoricalDistribution
+from stable_baselines3.common.policies import BasePolicy
+from stable_baselines3.common.type_aliases import Schedule, TensorDict
+from torch import nn
 from torch.distributions import Categorical
-from copy import deepcopy
-from rl4lms.algorithms.common.maskable.distributions import MaskableCategoricalDistribution
-from rl4lms.envs.text_generation.hf_generation_utils import override_generation_routines
-from stable_baselines3.common.type_aliases import TensorDict
-from rl4lms.algorithms.common.maskable.logits_processor import MaskLogitsProcessorCasualLM, MaskLogitsProcessorSeq2SeqLM
-from rl4lms.envs.text_generation.warm_start import ActorCriticWarmStartMixin, ActorOnlyWarmStartMixin, MaskableActorCriticWarmStartMixin
+from transformers import AutoModelForCausalLM, AutoModelForSeq2SeqLM, AutoTokenizer
 from transformers.modeling_utils import unwrap_model
+
+from rl4lms.algorithms.common.maskable.distributions import (
+    MaskableCategoricalDistribution,
+)
+from rl4lms.algorithms.common.maskable.logits_processor import (
+    MaskLogitsProcessorCasualLM,
+    MaskLogitsProcessorSeq2SeqLM,
+)
+from rl4lms.envs.text_generation.hf_generation_utils import override_generation_routines
+from rl4lms.envs.text_generation.warm_start import (
+    ActorCriticWarmStartMixin,
+    ActorOnlyWarmStartMixin,
+    MaskableActorCriticWarmStartMixin,
+)
+
 
 class PolicyType(Enum):
     CAUSAL = 0
@@ -62,12 +73,13 @@ class LMActorCriticPolicy(BasePolicy, ActorCriticWarmStartMixin):
             self._value_model.config.hidden_size, 1, bias=False)
 
         # apply model parallel
-        if torch.cuda.is_available() and self._apply_model_parallel:
-            if self._policy_model.is_parallelizable:
-                self._policy_model.parallelize()
-                self._ref_model.parallelize()
-            if self._value_model.is_parallelizable:
-                self._value_model.parallelize()
+        if torch.cuda.device_count() > 1:
+            if torch.cuda.is_available() and self._apply_model_parallel:
+                if self._policy_model.is_parallelizable:
+                    self._policy_model.parallelize()
+                    self._ref_model.parallelize()
+                if self._value_model.is_parallelizable:
+                    self._value_model.parallelize()
         self._value_head = self._value_head.to(self.device)
 
     def _setup_optimizer(self, optimizer_kwargs: Dict[str, Any],
@@ -373,17 +385,17 @@ class Seq2SeqLMActorCriticPolicy(LMActorCriticPolicy):
             self._value_model.config.hidden_size, 1, bias=False)
 
         # apply model parallel
-        if torch.cuda.is_available():
+        self._value_head.to(self.device)
+        if torch.cuda.is_available() and torch.cuda.device_count() > 1:
             if self._apply_model_parallel and self._policy_model.is_parallelizable:
                 self._policy_model.parallelize()
                 self._ref_model.parallelize()
                 self._value_model.parallelize()
-                self._value_head = self._value_head.to(self.device)
             else: # else defaults to data parallel
                 self._policy_model = torch.nn.DataParallel(self._policy_model)
                 self._ref_model = torch.nn.DataParallel(self._ref_model)
                 self._value_model = torch.nn.DataParallel(self._value_model)
-                self._value_head = torch.nn.DataParallel(self._value_head.to(self.device))
+                self._value_head = torch.nn.DataParallel(self._value_head)
 
 
     def forward_policy(self, obs: TensorDict,
@@ -602,13 +614,14 @@ class MaskableLMActorCriticPolicy(BasePolicy, MaskableActorCriticWarmStartMixin)
             self._value_model.config.hidden_size, 1, bias=False)
 
         # apply model parallel
-        if torch.cuda.is_available() and self._apply_model_parallel:
-            if self._policy_model.is_parallelizable:
-                self._policy_model.parallelize()
-                self._ref_model.parallelize()
-                self._mask_model.parallelize()
-            if self._value_model.is_parallelizable:
-                self._value_model.parallelize()
+        if torch.cuda.device_count() > 1:
+            if torch.cuda.is_available() and self._apply_model_parallel:
+                if self._policy_model.is_parallelizable:
+                    self._policy_model.parallelize()
+                    self._ref_model.parallelize()
+                    self._mask_model.parallelize()
+                if self._value_model.is_parallelizable:
+                    self._value_model.parallelize()
         self._value_head = self._value_head.to(self.device)
 
         self.logits_processor = MaskLogitsProcessorCasualLM(
@@ -940,19 +953,19 @@ class MaskableSeq2SeqLMActorCriticPolicy(MaskableLMActorCriticPolicy):
             self._value_model.config.hidden_size, 1, bias=False)
 
         # apply model parallel
-        if torch.cuda.is_available():
+        self._value_head.to(self.device)
+        if torch.cuda.is_available() and torch.cuda.device_count() > 1:
             if self._apply_model_parallel and self._policy_model.is_parallelizable:
                 self._policy_model.parallelize()
                 self._ref_model.parallelize()
                 self._mask_model.parallelize()
                 self._value_model.parallelize()
-                self._value_head = self._value_head.to(self.device)
             else: # else defaults to data parallel
                 self._policy_model = torch.nn.DataParallel(self._policy_model)
                 self._ref_model = torch.nn.DataParallel(self._ref_model)
                 self._mask_model = torch.nn.DataParallel(self._mask_model)
                 self._value_model = torch.nn.DataParallel(self._value_model)
-                self._value_head = torch.nn.DataParallel(self._value_head.to(self.device))
+                self._value_head = torch.nn.DataParallel(self._value_head)
 
         self.logits_processor = MaskLogitsProcessorSeq2SeqLM(
             self._mask_model, self.action_space, self.top_mask, self._apply_model_parallel, self.get_policy_first_device, self.mask_type, self.min_tokens_to_keep)

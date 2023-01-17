@@ -81,7 +81,8 @@ class CausalLMActorCriticPolicy(LMActorCriticPolicy, ActorCriticWarmStartMixin):
         )
 
         # apply model parallel
-        if torch.cuda.is_available():
+        self._value_head.to(self.device)
+        if torch.cuda.is_available() and torch.cuda.device_count() > 1:
             if self._apply_model_parallel and self._policy_model.is_parallelizable:
                 self._policy_model.parallelize()
                 self._ref_model.parallelize()
@@ -92,7 +93,7 @@ class CausalLMActorCriticPolicy(LMActorCriticPolicy, ActorCriticWarmStartMixin):
                 self._ref_model = torch.nn.DataParallel(self._ref_model)
                 self._value_model = torch.nn.DataParallel(self._value_model)
                 self._value_head = torch.nn.DataParallel(
-                    self._value_head.to(self.device)
+                    self._value_head
                 )
 
     def _prepare_inputs_for_model(
@@ -460,6 +461,7 @@ class MaskedCausalLMActorCriticPolicy(
         # assert torch.all(torch.isfinite(log_prob))
 
         # update the model kwargs for further generation
+        #TODO this breaks if using DataParallel, change to unwrap
         past_model_kwargs = self._policy_model._update_model_kwargs_for_generation(
             output,
             past_model_kwargs,
