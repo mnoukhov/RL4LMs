@@ -256,7 +256,7 @@ class OnPolicyTrainer(TrainerWarmStartMixin):
                     )
                     self._alg.policy._ref_model.load_state_dict(
                         pretrained_model.state_dict(), strict=False
-                    )
+                    ).to(self._alg.policy.device)
 
             # save the policy checkpoint
             if (epoch + 1) % self._train_eval_config.get("save_every", 20) == 0:

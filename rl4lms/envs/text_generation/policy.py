@@ -385,8 +385,12 @@ class Seq2SeqLMActorCriticPolicy(LMActorCriticPolicy):
             self._value_model.config.hidden_size, 1, bias=False)
 
         # apply model parallel
-        self._value_head.to(self.device)
-        if torch.cuda.is_available() and torch.cuda.device_count() > 1:
+        if torch.cuda.is_available():
+            self._value_head.to(self.device)
+            # if torch.cuda.device_count() == 1:
+            #     self._policy_model.to(self.device)
+            #     self._ref_model.to(self.device)
+            #     self._value_model.to(self.device)
             if self._apply_model_parallel and self._policy_model.is_parallelizable:
                 self._policy_model.parallelize()
                 self._ref_model.parallelize()
@@ -614,15 +618,19 @@ class MaskableLMActorCriticPolicy(BasePolicy, MaskableActorCriticWarmStartMixin)
             self._value_model.config.hidden_size, 1, bias=False)
 
         # apply model parallel
-        if torch.cuda.device_count() > 1:
-            if torch.cuda.is_available() and self._apply_model_parallel:
-                if self._policy_model.is_parallelizable:
-                    self._policy_model.parallelize()
-                    self._ref_model.parallelize()
-                    self._mask_model.parallelize()
-                if self._value_model.is_parallelizable:
-                    self._value_model.parallelize()
-        self._value_head = self._value_head.to(self.device)
+        if torch.cuda.is_available():
+            self._value_head.to(self.device)
+            # if torch.cuda.device_count() == 1:
+            #     self._policy_model.to(self.device)
+            #     self._ref_model.to(self.device)
+            #     self._value_model.to(self.device)
+            #     self._mask_model.to(self.device)
+            if self._policy_model.is_parallelizable and self._apply_model_parallel:
+                self._policy_model.parallelize()
+                self._ref_model.parallelize()
+                self._mask_model.parallelize()
+            if self._value_model.is_parallelizable and self._apply_model_parallel:
+                self._value_model.parallelize()
 
         self.logits_processor = MaskLogitsProcessorCasualLM(
             self._mask_model, self.action_space, self.top_mask, self._apply_model_parallel, self.get_policy_first_device, self.mask_type, self.min_tokens_to_keep)
@@ -953,9 +961,14 @@ class MaskableSeq2SeqLMActorCriticPolicy(MaskableLMActorCriticPolicy):
             self._value_model.config.hidden_size, 1, bias=False)
 
         # apply model parallel
-        self._value_head.to(self.device)
-        if torch.cuda.is_available() and torch.cuda.device_count() > 1:
-            if self._apply_model_parallel and self._policy_model.is_parallelizable:
+        if torch.cuda.is_available():
+            self._value_head.to(self.device)
+            if torch.cuda.device_count() == 1:
+                self._policy_model.to(self.device)
+                self._ref_model.to(self.device)
+                self._value_model.to(self.device)
+                self._mask_model.to(self.device)
+            elif self._apply_model_parallel and self._policy_model.is_parallelizable:
                 self._policy_model.parallelize()
                 self._ref_model.parallelize()
                 self._mask_model.parallelize()
