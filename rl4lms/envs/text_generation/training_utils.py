@@ -212,6 +212,9 @@ class OnPolicyTrainer(TrainerWarmStartMixin):
         self._ref_causal_perplexity = bool(
             self._train_eval_config.get("ref_causal_perplexity", False)
         )
+        self._ref_learned_metric = bool(
+            self._train_eval_config.get("ref_learned_metric", False)
+        )
 
     def _evaluate_on_datapools(self, epoch: int, splits: List[str] = ["val", "test"]):
         for split in splits:
@@ -227,6 +230,7 @@ class OnPolicyTrainer(TrainerWarmStartMixin):
                 tracker=self._tracker,
                 gen_kwargs=self._eval_gen_kwargs,
                 ref_causal_perplexity=self._ref_causal_perplexity,
+                ref_learned_metric=self._ref_learned_metric,
             )
 
     def train_and_eval(self):

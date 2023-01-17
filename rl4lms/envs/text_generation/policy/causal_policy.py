@@ -318,6 +318,92 @@ class CausalLMActorCriticPolicy(LMActorCriticPolicy, ActorCriticWarmStartMixin):
     def predict_values(self, obs: TensorDict):
         return self.forward_value(obs).values
 
+    def ref_generate(
+        self,
+        tokenizer: AutoTokenizer,
+        texts: List[str] = None,
+        max_prompt_length: int = None,
+        input_ids: torch.tensor = None,
+        attention_mask: torch.tensor = None,
+        gen_kwargs: Dict[str, Any] = None,
+    ) -> GenerationOutputs:
+
+        # if it different from rollout gen kwargs
+        if gen_kwargs is None:
+            gen_kwargs = self._generation_kwargs
+
+        # switch to eval
+        self._ref_model.eval()
+
+        if (
+            input_ids is None
+            and attention_mask is None
+            and texts is not None
+            and max_prompt_length is not None
+        ):
+            # override truncation side for prompt
+            prev_truncation_side = tokenizer.truncation_side
+            tokenizer.truncation_side = self._prompt_truncation_side
+            encodings = tokenizer(
+                texts,
+                padding="max_length",
+                max_length=max_prompt_length,
+                return_tensors="pt",
+                return_attention_mask=True,
+                truncation=True,
+            )
+            input_ids = encodings.input_ids
+            attention_mask = encodings.attention_mask
+            tokenizer.truncation_side = prev_truncation_side
+
+        # if min_length argument is set and if policy is not a seq2seq LM (ie. causal LM)
+        # then it has to be adjusted to input_size + min_length
+        if "min_length" in gen_kwargs.keys() and not self.is_encoder_decoder(
+            self._ref_model
+        ):
+            generation_kwargs_ = deepcopy(gen_kwargs)
+            generation_kwargs_["min_length"] = (
+                input_ids.shape[1] + gen_kwargs["min_length"]
+            )
+        else:
+            generation_kwargs_ = gen_kwargs
+
+        # generate
+        gen_output = unwrap_model(self._ref_model).generate(
+            inputs=input_ids.to(self.get_policy_first_device()),
+            attention_mask=attention_mask.to(self.get_policy_first_device()),
+            return_dict_in_generate=True,
+            output_scores=True,
+            **generation_kwargs_,
+        )
+
+        # number of tokens generated
+        seq_length = len(gen_output["scores"])
+
+        # get only the generated text (excluding prompt)
+        gen_tokens = gen_output["sequences"][:, -seq_length:]
+
+        # to texts
+        gen_texts = [
+            tokenizer.decode(output, skip_special_tokens=True)
+            for output in gen_tokens.tolist()
+        ]
+
+        # extract scores (logits)
+        step_wise_logprobs = []
+        step_wise_actions = []
+        for step, logits in enumerate(gen_output["scores"]):
+            raw_logits, _ = logits
+            actions_at_step = gen_tokens[:, step]
+            distribution = Categorical(logits=raw_logits)
+            log_probs = distribution.log_prob(actions_at_step)
+            step_wise_logprobs.append(log_probs)
+            step_wise_actions.append(actions_at_step)
+
+        gen_output = GenerationOutputs(
+            step_wise_logprobs, step_wise_actions, gen_tokens, gen_texts
+        )
+        return gen_output
 
 class MaskedCausalLMActorCriticPolicy(
     CausalLMActorCriticPolicy, MaskableActorCriticWarmStartMixin

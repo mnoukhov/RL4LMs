@@ -7,7 +7,11 @@ from transformers.modeling_utils import unwrap_model
 
 from rl4lms.data_pools.custom_text_generation_pools import Sample
 from rl4lms.envs.text_generation.logging_utils import Tracker
-from rl4lms.envs.text_generation.metric import BaseMetric, Perplexity
+from rl4lms.envs.text_generation.metric import (
+    BaseMetric,
+    LearnedRewardMetric,
+    Perplexity,
+)
 
 
 def get_batch(samples: List[Sample], batch_size: int):
@@ -32,6 +36,7 @@ def evaluate_on_samples(
     dt_control_token: str = "",
     gen_kwargs: Dict[str, Any] = None,
     ref_causal_perplexity: bool = False,
+    ref_learned_metric: bool = False,
 ):
     # generate text by batch
     all_generated_ref_texts = []
@@ -51,6 +56,12 @@ def evaluate_on_samples(
         all_ref_texts.extend(batch_ref_texts)
         all_prompt_texts.extend(batch_prompt_texts)
         all_meta_infos.extend(batch_meta_infos)
+
+        if ref_learned_metric:
+            batch_generated_ref_texts = ref_generate_text(
+                policy, tokenizer, batch, max_prompt_length, dt_control_token, gen_kwargs
+            )
+            all_generated_ref_texts.extend(batch_generated_ref_texts)
 
     # compute metrics
     corpus_level_metrics = {}
@@ -82,6 +93,22 @@ def evaluate_on_samples(
                 }
 
                 metric_dict.update(ref_metric_dict_renamed)
+            
+            elif isinstance(metric, LearnedRewardMetric) and ref_learned_metric:
+                ref_metric_dict = metric.compute(
+                    all_prompt_texts,
+                    all_generated_ref_texts,
+                    all_ref_texts,
+                    all_meta_infos,
+                    unwrap_model(policy._policy_model),
+                    split_name,
+                )
+                ref_metric_dict_renamed = {
+                    key.replace("learned_automodel_metric", "ref_learned_automodel_metric"): value
+                    for key, value in ref_metric_dict.items()
+                }
+
+                metric_dict.update(ref_metric_dict_renamed)
 
             for metric_key, (sample_scores, corpus_score) in metric_dict.items():
                 if sample_scores is None:
@@ -106,6 +133,10 @@ def evaluate_on_samples(
                 ]
             ),
         }
+
+        if ref_learned_metric:
+            sample_prediction['generated_ref_text'] = all_generated_ref_texts[ix]
+
         for metric_key, sample_scores in sample_scores_by_metric.items():
             sample_prediction[metric_key] = sample_scores[ix]
         sample_predictions_dict.append(sample_prediction)
