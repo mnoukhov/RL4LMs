@@ -209,6 +209,8 @@ class OnPolicyTrainer(TrainerWarmStartMixin):
         _reset_freq = self._train_eval_config.get("reset_freq", None)
         self._reset_freq = None if _reset_freq is None else int(_reset_freq)
         self._reset_ema = bool(self._train_eval_config.get("reset_ema", False))
+        _reset_ema_freq = self._train_eval_config.get("reset_ema_freq", None)
+        self._reset_ema_freq = _reset_freq if _reset_ema_freq is None else int(_reset_ema_freq)
         self._ref_causal_perplexity = bool(
             self._train_eval_config.get("ref_causal_perplexity", False)
         )
@@ -253,16 +255,16 @@ class OnPolicyTrainer(TrainerWarmStartMixin):
                 )
                 logger.info("resetting policy to ref")
 
-                if self._reset_ema:
-                    logger.info("resetting ema to pretrained")
-                    pretrained_model = AutoModelForCausalLM.from_pretrained(
-                        self._alg.policy._model_name
-                    )
-                    self._alg.policy._ref_model.load_state_dict(
-                        pretrained_model.state_dict(), strict=False
-                    )
-                    self._alg.policy._ref_model.to(self._alg.policy.device)
-                    self._alg.policy._ref_model.eval()
+            if self._reset_ema and self._reset_ema_freq is not None and epoch % self._reset_ema_freq == 0:
+                logger.info("resetting ema to pretrained")
+                pretrained_model = AutoModelForCausalLM.from_pretrained(
+                    self._alg.policy._model_name
+                )
+                self._alg.policy._ref_model.load_state_dict(
+                    pretrained_model.state_dict(), strict=False
+                )
+                self._alg.policy._ref_model.to(self._alg.policy.device)
+                self._alg.policy._ref_model.eval()
 
             # save the policy checkpoint
             if (epoch + 1) % self._train_eval_config.get("save_every", 20) == 0:
