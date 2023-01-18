@@ -73,8 +73,12 @@ class LMActorCriticPolicy(BasePolicy, ActorCriticWarmStartMixin):
             self._value_model.config.hidden_size, 1, bias=False)
 
         # apply model parallel
-        if torch.cuda.device_count() > 1:
-            if torch.cuda.is_available() and self._apply_model_parallel:
+        if torch.cuda.is_available():
+            if torch.cuda.device_count() == 1:
+                self._policy_model.to("cuda")
+                self._ref_model.to("cuda")
+                self._value_model.to("cuda")
+            elif self._apply_model_parallel:
                 if self._policy_model.is_parallelizable:
                     self._policy_model.parallelize()
                     self._ref_model.parallelize()
@@ -386,12 +390,12 @@ class Seq2SeqLMActorCriticPolicy(LMActorCriticPolicy):
 
         # apply model parallel
         if torch.cuda.is_available():
-            self._value_head.to(self.device)
-            # if torch.cuda.device_count() == 1:
-            #     self._policy_model.to(self.device)
-            #     self._ref_model.to(self.device)
-            #     self._value_model.to(self.device)
-            if self._apply_model_parallel and self._policy_model.is_parallelizable:
+            self._value_head.to("cuda")
+            if torch.cuda.device_count() == 1:
+                self._policy_model.to("cuda")
+                self._ref_model.to("cuda")
+                self._value_model.to("cuda")
+            elif self._apply_model_parallel and self._policy_model.is_parallelizable:
                 self._policy_model.parallelize()
                 self._ref_model.parallelize()
                 self._value_model.parallelize()

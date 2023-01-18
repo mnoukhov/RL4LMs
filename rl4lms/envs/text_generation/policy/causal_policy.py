@@ -82,13 +82,13 @@ class CausalLMActorCriticPolicy(LMActorCriticPolicy, ActorCriticWarmStartMixin):
 
         # apply model parallel
         if torch.cuda.is_available():
-            self._value_head.to(self.device)
+            self._value_head.to("cuda")
 
-            # if torch.cuda.device_count() == 1:
-            #     self._policy_model.to(self.device)
-            #     self._ref_model.to(self.device)
-            #     self._value_model.to(self.device)
-            if self._apply_model_parallel and self._policy_model.is_parallelizable:
+            if torch.cuda.device_count() == 1:
+                self._policy_model.to("cuda")
+                self._ref_model.to("cuda")
+                self._value_model.to("cuda")
+            elif self._apply_model_parallel and self._policy_model.is_parallelizable:
                 self._policy_model.parallelize()
                 self._ref_model.parallelize()
                 self._value_model.parallelize()
@@ -459,7 +459,9 @@ class MaskedCausalLMActorCriticPolicy(
             self._mask_model = self._ref_model.eval()
 
         if torch.cuda.is_available():
-            if (
+            if torch.cuda.device_count() == 1:
+                self._mask_model.to("cuda")
+            elif (
                 unwrap_model(self._mask_model).is_parallelizable
                 and self._apply_model_parallel
             ):
