@@ -34,7 +34,7 @@ alg:
     
   kl_div:
     coeff: 0.1
-    target_kl: 1.0
+    target_kl: 0.8
   policy:
     id: causal_lm_actor_critic_policy
     args:
@@ -50,7 +50,7 @@ train_evaluation:
   ref_learned_metric: True
   reset_freq: 20
   reset_ema: True
-  reset_ema_freq: 40
+  reset_ema_freq: 80
   eval_batch_size: 256
   n_iters: 100
   eval_every: 10

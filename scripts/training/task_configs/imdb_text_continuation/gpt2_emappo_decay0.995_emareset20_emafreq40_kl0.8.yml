@@ -34,7 +34,7 @@ alg:
     
   kl_div:
     coeff: 0.1
-    target_kl: 1.0
+    target_kl: 0.8
   policy:
     id: causal_lm_actor_critic_policy
     args:
