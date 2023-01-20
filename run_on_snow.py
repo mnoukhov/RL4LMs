@@ -11,13 +11,17 @@ from scripts.training.train_text_generation import main
 
 
 def run_exp(exp_dict, savedir, args):
+    experiment_name = exp_dict.pop("name")
+    run_group = exp_dict.pop("group")
+
     if not args.no_wandb:
-        os.environ['WANDB_RUN_ID'] = os.path.basename(savedir)
+        os.environ["WANDB_RUN_ID"] = os.path.basename(savedir)
+        os.environ["WANDB_RUN_GROUP"] = run_group
 
     main(
-        config_path=args.exp_group,
+        config_path_or_config=exp_dict,
         project_name="rl4lms",
-        experiment_name=os.path.basename(args.exp_group),
+        experiment_name=experiment_name,
         base_path_to_store_results=savedir,
         entity_name="mila-language-drift",
         log_to_wandb=(not args.no_wandb),
@@ -72,7 +76,7 @@ if __name__ == "__main__":
     args, _ = parser.parse_known_args()
 
     # match all config yamls
-    if args.exp_group.endswith('*'):
+    if args.exp_group.endswith("*"):
         exp_yamls = glob.glob(args.exp_group)
     else:
         exp_yamls = [args.exp_group]
@@ -87,6 +91,8 @@ if __name__ == "__main__":
         for seed in range(args.seeds):
             seed_exp_dict = copy.deepcopy(exp_dict)
             seed_exp_dict["alg"]["args"]["seed"] = seed
+            seed_exp_dict["name"] = os.path.basename(exp_yaml_path)
+            seed_exp_dict["group"] = hu.hash_dict(exp_dict)
             exp_list.append(seed_exp_dict)
 
     if args.job_scheduler == "toolkit":
@@ -107,7 +113,6 @@ if __name__ == "__main__":
                 "HOME=/home/toolkit",
                 f"HF_HOME=/home/toolkit/huggingface/",
                 f"WANDB_API_KEY={wandb_api_key}",
-                f"WANDB_RUN_GROUP={hu.hash_dict(exp_dict)}",
                 f"WANDB_RESUME=allow",
             ],
             "restartable": True,

@@ -11,7 +11,7 @@ from rl4lms.envs.text_generation.training_utils import (
 
 
 def main(
-    config_path: str,
+    config_path_or_config: str,
     project_name: str,
     experiment_name: str,
     base_path_to_store_results: str,
@@ -19,9 +19,12 @@ def main(
     log_to_wandb: bool,
 ):
 
-    # load the config file
-    with open(config_path, "r") as fp:
-        config = yaml.safe_load(fp)
+    if isinstance(config_path_or_config, dict):
+        config = config_path_or_config
+    else:
+        # load the config file
+        with open(config_path_or_config, "r") as fp:
+            config = yaml.safe_load(fp)
 
     # load tracker
     tracker = Tracker(
