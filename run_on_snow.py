@@ -1,5 +1,6 @@
 import argparse
 import copy
+import glob
 import os
 
 import yaml
@@ -70,15 +71,23 @@ if __name__ == "__main__":
 
     args, _ = parser.parse_known_args()
 
-    # 1 config yaml per experiment
-    with open(args.exp_group, "r") as fp:
-        exp_dict = yaml.safe_load(fp)
+    # match all config yamls
+    if args.exp_group.endswith('*'):
+        exp_yamls = glob.glob(args.exp_group)
+    else:
+        exp_yamls = [args.exp_group]
 
     exp_list = []
-    for seed in range(args.seeds):
-        seed_exp_dict = copy.deepcopy(exp_dict)
-        seed_exp_dict["alg"]["args"]["seed"] = seed
-        exp_list.append(seed_exp_dict)
+    for exp_yaml_path in exp_yamls:
+        with open(exp_yaml_path, "r") as fp:
+            exp_dict = yaml.safe_load(fp)
+
+        print(os.path.basename(exp_yaml_path))
+
+        for seed in range(args.seeds):
+            seed_exp_dict = copy.deepcopy(exp_dict)
+            seed_exp_dict["alg"]["args"]["seed"] = seed
+            exp_list.append(seed_exp_dict)
 
     if args.job_scheduler == "toolkit":
         with open("/home/toolkit/wandb_api_key", "r") as f:
