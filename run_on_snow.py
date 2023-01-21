@@ -96,7 +96,7 @@ if __name__ == "__main__":
 
         print(os.path.basename(exp_yaml_path))
 
-        for seed in range(args.seeds):
+        for seed in seeds:
             seed_exp_dict = copy.deepcopy(exp_dict)
             seed_exp_dict["alg"]["args"]["seed"] = seed
             seed_exp_dict["name"] = os.path.basename(exp_yaml_path)
