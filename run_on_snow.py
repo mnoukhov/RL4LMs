@@ -68,13 +68,21 @@ if __name__ == "__main__":
     parser.add_argument(
         "--no-wandb", action="store_true", help="disable wandb", default=False
     )
-    parser.add_argument("--seeds", type=int, default=1)
+    parser.add_argument("--seeds", type=str, default="1")
     # parser.add_argument(
     #     "--exp-id", default=None, help="id used to resume an experiment"
     # )
 
     args, _ = parser.parse_known_args()
 
+    if args.seeds.isdigit():
+        seeds = range(int(args.seeds))
+    else:
+        assert "-" in args.seeds, "seeds must be int or range x-y"
+        start_str, end_str = args.seeds.split("-")
+        seeds = range(int(start_str), int(end_str))
+
+    print(f"Running seeds {[x for x in seeds]}")
     # match all config yamls
     if args.exp_group.endswith("*"):
         exp_yamls = glob.glob(args.exp_group)
