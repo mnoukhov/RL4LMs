@@ -231,6 +231,7 @@ class OnPolicyTrainer(TrainerWarmStartMixin):
             self._alg.set_ema_model(self._ema_model)
         else:
             self._ema_model = self._alg.policy._ref_model
+            self._alg.set_ema_model(self._ema_model)
 
     def _evaluate_on_datapools(self, epoch: int, splits: List[str] = ["val", "test"]):
         for split in splits:
