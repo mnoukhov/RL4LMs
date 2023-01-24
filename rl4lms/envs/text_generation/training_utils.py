@@ -210,13 +210,27 @@ class OnPolicyTrainer(TrainerWarmStartMixin):
         self._reset_freq = None if _reset_freq is None else int(_reset_freq)
         self._reset_ema = bool(self._train_eval_config.get("reset_ema", False))
         _reset_ema_freq = self._train_eval_config.get("reset_ema_freq", None)
-        self._reset_ema_freq = _reset_freq if _reset_ema_freq is None else int(_reset_ema_freq)
+        self._reset_ema_freq = (
+            _reset_freq if _reset_ema_freq is None else int(_reset_ema_freq)
+        )
         self._ref_causal_perplexity = bool(
             self._train_eval_config.get("ref_causal_perplexity", False)
         )
         self._ref_learned_metric = bool(
             self._train_eval_config.get("ref_learned_metric", False)
         )
+        self._separate_ema_model = bool(
+            self._train_eval_config.get("separate_ema_model", False)
+        )
+        if self._separate_ema_model:
+            self._ema_model = AutoModelForCausalLM.from_pretrained(
+                self._alg.policy._model_name
+            )
+            self._ema_model.to(self._alg.policy._ref_model.device)
+            self._ema_model.load_state_dict(self._alg.policy._ref_model.state_dict())
+            self._alg.set_ema_model(self._ema_model)
+        else:
+            self._ema_model = self._alg.policy._ref_model
 
     def _evaluate_on_datapools(self, epoch: int, splits: List[str] = ["val", "test"]):
         for split in splits:
@@ -251,20 +265,24 @@ class OnPolicyTrainer(TrainerWarmStartMixin):
 
             if self._reset_freq is not None and epoch % self._reset_freq == 0:
                 self._alg.policy._policy_model.load_state_dict(
-                    self._alg.policy._ref_model.state_dict(), strict=False
+                    self._ema_model.state_dict(), strict=False
                 )
                 logger.info("resetting policy to ref")
 
-            if self._reset_ema and self._reset_ema_freq is not None and epoch % self._reset_ema_freq == 0:
+            if (
+                self._reset_ema
+                and self._reset_ema_freq is not None
+                and epoch % self._reset_ema_freq == 0
+            ):
                 logger.info("resetting ema to pretrained")
                 pretrained_model = AutoModelForCausalLM.from_pretrained(
                     self._alg.policy._model_name
                 )
-                self._alg.policy._ref_model.load_state_dict(
+                self._ema_model.load_state_dict(
                     pretrained_model.state_dict(), strict=False
                 )
-                self._alg.policy._ref_model.to(self._alg.policy.device)
-                self._alg.policy._ref_model.eval()
+                self._ema_model.to(self._alg.policy.device)
+                self._ema_model.eval()
 
             # save the policy checkpoint
             if (epoch + 1) % self._train_eval_config.get("save_every", 20) == 0:

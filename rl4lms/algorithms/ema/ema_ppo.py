@@ -97,6 +97,10 @@ class EMAPPO(PPO):
         )
 
         self.ema_decay = ema_decay
+        self.ema_model = self.policy._ref_model
+
+    def set_ema_model(self, ema_model):
+        self.ema_model = ema_model
 
     def learn(
         self,
@@ -110,19 +114,28 @@ class EMAPPO(PPO):
         eval_log_path: Optional[str] = None,
         reset_num_timesteps: bool = True,
     ) -> "EMAPPO":
-        # This could probably just be a callback but learn isn't implemented in 
-        # a way that would make it work anyways 
+        # This could probably just be a callback but learn isn't implemented in
+        # a way that would make it work anyways
         iteration = 0
 
         total_timesteps, callback = self._setup_learn(
-            total_timesteps, eval_env, callback, eval_freq, n_eval_episodes, eval_log_path, reset_num_timesteps, tb_log_name
+            total_timesteps,
+            eval_env,
+            callback,
+            eval_freq,
+            n_eval_episodes,
+            eval_log_path,
+            reset_num_timesteps,
+            tb_log_name,
         )
 
         callback.on_training_start(locals(), globals())
 
         while self.num_timesteps < total_timesteps:
 
-            continue_training = self.collect_rollouts(self.env, callback, self.rollout_buffer, n_rollout_steps=self.n_steps)
+            continue_training = self.collect_rollouts(
+                self.env, callback, self.rollout_buffer, n_rollout_steps=self.n_steps
+            )
 
             if continue_training is False:
                 break
@@ -132,14 +145,29 @@ class EMAPPO(PPO):
 
             # Display training infos
             if log_interval is not None and iteration % log_interval == 0:
-                fps = int((self.num_timesteps - self._num_timesteps_at_start) / (time.time() - self.start_time))
+                fps = int(
+                    (self.num_timesteps - self._num_timesteps_at_start)
+                    / (time.time() - self.start_time)
+                )
                 self.logger.record("time/iterations", iteration, exclude="tensorboard")
                 if len(self.ep_info_buffer) > 0 and len(self.ep_info_buffer[0]) > 0:
-                    self.logger.record("rollout/ep_rew_mean", safe_mean([ep_info["r"] for ep_info in self.ep_info_buffer]))
-                    self.logger.record("rollout/ep_len_mean", safe_mean([ep_info["l"] for ep_info in self.ep_info_buffer]))
+                    self.logger.record(
+                        "rollout/ep_rew_mean",
+                        safe_mean([ep_info["r"] for ep_info in self.ep_info_buffer]),
+                    )
+                    self.logger.record(
+                        "rollout/ep_len_mean",
+                        safe_mean([ep_info["l"] for ep_info in self.ep_info_buffer]),
+                    )
                 self.logger.record("time/fps", fps)
-                self.logger.record("time/time_elapsed", int(time.time() - self.start_time), exclude="tensorboard")
-                self.logger.record("time/total_timesteps", self.num_timesteps, exclude="tensorboard")
+                self.logger.record(
+                    "time/time_elapsed",
+                    int(time.time() - self.start_time),
+                    exclude="tensorboard",
+                )
+                self.logger.record(
+                    "time/total_timesteps", self.num_timesteps, exclude="tensorboard"
+                )
                 self.logger.dump(step=self.num_timesteps)
 
             self.train()
@@ -154,7 +182,7 @@ class EMAPPO(PPO):
     @th.no_grad()
     def ema_update_ref_model(self):
         new_model = self.policy._policy_model
-        ema_model = self.policy._ref_model
+        ema_model = self.ema_model
         decay = self.ema_decay
 
         ema_state_dict = {}
