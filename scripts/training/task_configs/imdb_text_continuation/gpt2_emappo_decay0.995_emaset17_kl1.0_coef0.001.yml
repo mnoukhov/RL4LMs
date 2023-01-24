@@ -47,7 +47,6 @@ alg:
       
 train_evaluation:
   reset_freq: 17
-  reset_ema: True
   eval_batch_size: 256
   n_iters: 50
   eval_every: 10
