@@ -65,6 +65,9 @@ class CausalLMActorCriticPolicy(LMActorCriticPolicy, ActorCriticWarmStartMixin):
         )
         self.load_from_dict(state_dict)
 
+    def set_ema_model(self, ema_model):
+        self._ema_model = ema_model
+
     def _build_model_heads(self, model_name: str):
         self._policy_model = AutoModelForCausalLM.from_pretrained(model_name)
         self._policy_model.__class__ = override_generation_routines(
@@ -96,9 +99,7 @@ class CausalLMActorCriticPolicy(LMActorCriticPolicy, ActorCriticWarmStartMixin):
                 self._policy_model = torch.nn.DataParallel(self._policy_model)
                 self._ref_model = torch.nn.DataParallel(self._ref_model)
                 self._value_model = torch.nn.DataParallel(self._value_model)
-                self._value_head = torch.nn.DataParallel(
-                    self._value_head
-                )
+                self._value_head = torch.nn.DataParallel(self._value_head)
 
     def _prepare_inputs_for_model(
         self,
@@ -318,7 +319,7 @@ class CausalLMActorCriticPolicy(LMActorCriticPolicy, ActorCriticWarmStartMixin):
     def predict_values(self, obs: TensorDict):
         return self.forward_value(obs).values
 
-    def ref_generate(
+    def ema_generate(
         self,
         tokenizer: AutoTokenizer,
         texts: List[str] = None,
@@ -333,7 +334,7 @@ class CausalLMActorCriticPolicy(LMActorCriticPolicy, ActorCriticWarmStartMixin):
             gen_kwargs = self._generation_kwargs
 
         # switch to eval
-        self._ref_model.eval()
+        self._ema_model.eval()
 
         if (
             input_ids is None
@@ -359,7 +360,7 @@ class CausalLMActorCriticPolicy(LMActorCriticPolicy, ActorCriticWarmStartMixin):
         # if min_length argument is set and if policy is not a seq2seq LM (ie. causal LM)
         # then it has to be adjusted to input_size + min_length
         if "min_length" in gen_kwargs.keys() and not self.is_encoder_decoder(
-            self._ref_model
+            self._ema_model
         ):
             generation_kwargs_ = deepcopy(gen_kwargs)
             generation_kwargs_["min_length"] = (
@@ -369,7 +370,7 @@ class CausalLMActorCriticPolicy(LMActorCriticPolicy, ActorCriticWarmStartMixin):
             generation_kwargs_ = gen_kwargs
 
         # generate
-        gen_output = unwrap_model(self._ref_model).generate(
+        gen_output = unwrap_model(self._ema_model).generate(
             inputs=input_ids.to(self.get_policy_first_device()),
             attention_mask=attention_mask.to(self.get_policy_first_device()),
             return_dict_in_generate=True,
@@ -404,6 +405,7 @@ class CausalLMActorCriticPolicy(LMActorCriticPolicy, ActorCriticWarmStartMixin):
             step_wise_logprobs, step_wise_actions, gen_tokens, gen_texts
         )
         return gen_output
+
 
 class MaskedCausalLMActorCriticPolicy(
     CausalLMActorCriticPolicy, MaskableActorCriticWarmStartMixin
@@ -554,7 +556,7 @@ class MaskedCausalLMActorCriticPolicy(
         # assert torch.all(torch.isfinite(log_prob))
 
         # update the model kwargs for further generation
-        #TODO this breaks if using DataParallel, change to unwrap
+        # TODO this breaks if using DataParallel, change to unwrap
         past_model_kwargs = self._policy_model._update_model_kwargs_for_generation(
             output,
             past_model_kwargs,
@@ -658,7 +660,7 @@ class MaskedCausalLMActorCriticPolicy(
             return_dict_in_generate=True,
             output_scores=True,
             logits_processor=[self.logits_processor],
-            **generation_kwargs_
+            **generation_kwargs_,
         )
 
         # number of tokens generated

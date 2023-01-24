@@ -100,7 +100,8 @@ class EMAPPO(PPO):
         self.ema_model = self.policy._ref_model
 
     def set_ema_model(self, ema_model):
-        self.ema_model = ema_model
+        self.policy.set_ema_model(ema_model)
+        self.ema_model = self.policy._ema_model
 
     def learn(
         self,

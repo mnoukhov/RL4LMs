@@ -58,8 +58,13 @@ def evaluate_on_samples(
         all_meta_infos.extend(batch_meta_infos)
 
         if ref_learned_metric:
-            batch_generated_ref_texts = ref_generate_text(
-                policy, tokenizer, batch, max_prompt_length, dt_control_token, gen_kwargs
+            batch_generated_ref_texts = ema_generate_text(
+                policy,
+                tokenizer,
+                batch,
+                max_prompt_length,
+                dt_control_token,
+                gen_kwargs,
             )
             all_generated_ref_texts.extend(batch_generated_ref_texts)
 
@@ -93,7 +98,7 @@ def evaluate_on_samples(
                 }
 
                 metric_dict.update(ref_metric_dict_renamed)
-            
+
             elif isinstance(metric, LearnedRewardMetric) and ref_learned_metric:
                 ref_metric_dict = metric.compute(
                     all_prompt_texts,
@@ -104,7 +109,9 @@ def evaluate_on_samples(
                     split_name,
                 )
                 ref_metric_dict_renamed = {
-                    key.replace("learned_automodel_metric", "ref_learned_automodel_metric"): value
+                    key.replace(
+                        "learned_automodel_metric", "ref_learned_automodel_metric"
+                    ): value
                     for key, value in ref_metric_dict.items()
                 }
 
@@ -135,7 +142,7 @@ def evaluate_on_samples(
         }
 
         if ref_learned_metric:
-            sample_prediction['generated_ref_text'] = all_generated_ref_texts[ix]
+            sample_prediction["generated_ref_text"] = all_generated_ref_texts[ix]
 
         for metric_key, sample_scores in sample_scores_by_metric.items():
             sample_prediction[metric_key] = sample_scores[ix]
@@ -165,7 +172,7 @@ def generate_text(
     return generated_texts
 
 
-def ref_generate_text(
+def ema_generate_text(
     policy: BasePolicy,
     tokenizer: AutoTokenizer,
     samples: List[Sample],
@@ -176,7 +183,7 @@ def ref_generate_text(
     prompt_texts = [
         dt_control_token + sample.prompt_or_input_text for sample in samples
     ]
-    generated_texts = policy.ref_generate(
+    generated_texts = policy.ema_generate(
         tokenizer, prompt_texts, max_prompt_length, gen_kwargs=gen_kwargs
     ).gen_texts
     return generated_texts
