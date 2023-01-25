@@ -89,7 +89,7 @@ def evaluate_on_samples(
                     all_generated_texts,
                     all_ref_texts,
                     all_meta_infos,
-                    unwrap_model(policy._ref_model),
+                    unwrap_model(policy._ema_model),
                     split_name,
                 )
                 ref_metric_dict_renamed = {
