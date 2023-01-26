@@ -33,7 +33,7 @@ alg:
     ema_decay: 0.95
     
   kl_div:
-    coeff: 0.01
+    coeff: 0.001
     target_kl: 1.0
   policy:
     id: causal_lm_actor_critic_policy

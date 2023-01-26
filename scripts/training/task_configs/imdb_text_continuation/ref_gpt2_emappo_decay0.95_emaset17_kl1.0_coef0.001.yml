@@ -33,7 +33,7 @@ alg:
     ema_decay: 0.95
     
   kl_div:
-    coeff: 0.01
+    coeff: 0.001
     target_kl: 1.0
   policy:
     id: causal_lm_actor_critic_policy
@@ -49,7 +49,6 @@ train_evaluation:
   ref_causal_perplexity: True
   ref_learned_metric: True
   reset_freq: 17
-  reset_ema: True
   eval_batch_size: 256
   n_iters: 50
   eval_every: 6

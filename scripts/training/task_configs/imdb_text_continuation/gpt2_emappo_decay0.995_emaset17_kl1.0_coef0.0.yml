@@ -30,10 +30,10 @@ alg:
     verbose: 1
     learning_rate: 0.000001
     n_epochs: 5
-    ema_decay: 0.95
+    ema_decay: 0.995
     
   kl_div:
-    coeff: 0.01
+    coeff: 0.0
     target_kl: 1.0
   policy:
     id: causal_lm_actor_critic_policy
@@ -49,10 +49,10 @@ train_evaluation:
   ref_causal_perplexity: True
   ref_learned_metric: True
   reset_freq: 17
-  reset_ema: True
+  reset_ema: False
   eval_batch_size: 256
   n_iters: 50
-  eval_every: 6
+  eval_every: 10
   save_every: 10
   metrics:
     - id: learned_reward
