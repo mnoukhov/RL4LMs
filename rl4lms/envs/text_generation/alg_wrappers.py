@@ -6,8 +6,8 @@ import torch
 from stable_baselines3.common.buffers import DictRolloutBuffer, RolloutBuffer
 from stable_baselines3.common.callbacks import BaseCallback
 from stable_baselines3.common.on_policy_algorithm import OnPolicyAlgorithm
-from stable_baselines3.common.utils import obs_as_tensor
 from stable_baselines3.common.type_aliases import TensorDict
+from stable_baselines3.common.utils import obs_as_tensor
 from stable_baselines3.common.vec_env import VecEnv
 from transformers import PreTrainedTokenizer
 
@@ -218,25 +218,30 @@ def wrap_onpolicy_alg(
                         value_outputs.past_model_kwargs,
                     )
 
-                    # get reference log probs
-                    ref_policy_outputs: RefPolicyOutput = (
-                        self.policy.get_log_probs_ref_model(
-                            obs_tensor, actions_tensor, ref_past_state
+                    if self._kl_controller.kl_coeff != 0.0:
+                        # get reference log probs
+                        ref_policy_outputs: RefPolicyOutput = (
+                            self.policy.get_log_probs_ref_model(
+                                obs_tensor, actions_tensor, ref_past_state
+                            )
                         )
-                    )
-                    ref_log_probs, ref_past_state = (
-                        ref_policy_outputs.log_probs,
-                        ref_policy_outputs.past_model_kwargs,
-                    )
+                        ref_log_probs, ref_past_state = (
+                            ref_policy_outputs.log_probs,
+                            ref_policy_outputs.past_model_kwargs,
+                        )
 
-                    # sanity check
-                    assert torch.all(
-                        torch.isfinite(ref_log_probs)
-                    ), "Infinite values in log probs"
+                        # sanity check
+                        assert torch.all(
+                            torch.isfinite(ref_log_probs)
+                        ), "Infinite values in log probs"
 
-                    # compute KL rewards
-                    kl_div = raw_log_probs - ref_log_probs
-                    kl_rewards = -1 * self._kl_controller.kl_coeff * kl_div
+                        # compute KL rewards
+                        kl_div = raw_log_probs - ref_log_probs
+                        kl_rewards = -1 * self._kl_controller.kl_coeff * kl_div
+                    else:
+                        ref_log_probs = torch.zeros_like(raw_log_probs)
+                        kl_div = torch.zeros_like(raw_log_probs)
+                        kl_rewards = torch.zeros_like(raw_log_probs)
 
                 # step into env to get rewards
                 actions = actions_tensor.cpu().numpy()
