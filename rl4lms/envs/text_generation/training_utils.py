@@ -13,6 +13,7 @@ from transformers import (
     DataCollatorForSeq2Seq,
     Trainer,
     TrainingArguments,
+    set_seed,
 )
 
 from rl4lms.data_pools.text_generation_pool import Sample
@@ -201,6 +202,10 @@ class OnPolicyTrainer(TrainerWarmStartMixin):
         self._n_steps_per_iter = self._env.num_envs * self._alg.n_steps
 
         # gen kwargs for evaluation (if it is different from rollout gen kwargs)
+        _seed = self._train_eval_config.get("seed", None)
+        self._seed = None if _seed is None else int(_seed)
+        self._save_every = self._train_eval_config.get("save_every", 20)
+        self._eval_every = self._train_eval_config.get("eval_every")
         self._eval_gen_kwargs = self._train_eval_config.get("generation_kwargs", None)
 
         self.eval_before_train = self._train_eval_config.get("eval_before_train", True)
@@ -253,7 +258,11 @@ class OnPolicyTrainer(TrainerWarmStartMixin):
 
     def train_and_eval(self):
         # evaluate on val and test set before fine-tuning once
+        if self._seed is not None:
+            set_seed(self._seed)
+
         iter_start = self._trainer_state["current_iter"]
+        epoch = iter_start
         if self.eval_before_train:
             self._evaluate_on_datapools(epoch=iter_start)
 
@@ -287,20 +296,20 @@ class OnPolicyTrainer(TrainerWarmStartMixin):
                 self._ema_model.eval()
 
             # save the policy checkpoint
-            if (epoch + 1) % self._train_eval_config.get("save_every", 20) == 0:
+            if (epoch + 1) % self._save_every == 0:
                 self.save_trainer_state(
                     self._tracker, self._alg.policy, self._trainer_state
                 )
 
             # evaluate on val set in the given intervals
-            if (epoch + 1) % self._train_eval_config["eval_every"] == 0:
+            if (epoch + 1) % self._eval_every == 0:
                 self._evaluate_on_datapools(epoch=epoch, splits=["val"])
 
         # finally evaluate on val and test samples
         self._evaluate_on_datapools(epoch=epoch)
 
         # save model here - we save only the language model
-        if self._tracker is not None:
+        if self._tracker is not None and self._n_iters > 0:
             self._tracker.save_auto_model(self._alg.policy.get_language_model())
 
 
