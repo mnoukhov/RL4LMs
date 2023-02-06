@@ -1709,11 +1709,17 @@ class GenerationMixinWithRawScores:
                 continue  # don't waste resources running the code we don't need
 
             next_token_logits = outputs.logits[:, -1, :]
+            next_token_logits_raw = next_token_logits.clone()
+
+            # pre-process distribution
+            next_token_scores = logits_processor(
+                input_ids, next_token_logits, model_inputs=model_inputs)
+
 
             # Store scores, attentions and hidden_states when required
             if return_dict_in_generate:
                 if output_scores:
-                    scores += (next_token_logits,)
+                    scores += ((next_token_logits_raw, next_token_scores),)
                 if output_attentions:
                     decoder_attentions += (
                         (outputs.decoder_attentions,) if self.config.is_encoder_decoder else (
@@ -1729,12 +1735,8 @@ class GenerationMixinWithRawScores:
                         else (outputs.hidden_states,)
                     )
 
-            # pre-process distribution
-            next_tokens_scores = logits_processor(
-                input_ids, next_token_logits, model_inputs)
-
             # argmax
-            next_tokens = torch.argmax(next_tokens_scores, dim=-1)
+            next_tokens = torch.argmax(next_token_scores, dim=-1)
 
             # finished sentences should have their next token be a padding token
             if eos_token_id is not None:
