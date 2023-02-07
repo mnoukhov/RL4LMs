@@ -213,7 +213,7 @@ class IMDB(TextGenPool):
     IMDB Dataset for sentiment continuation task
     """
     @classmethod
-    def prepare(cls, split: str):
+    def prepare(cls, split: str, full_test: bool = True):
         dataset = load_dataset("imdb")
         if split in ["train", "val"]:
             dataset_split = dataset["train"].shuffle()
@@ -221,7 +221,11 @@ class IMDB(TextGenPool):
             train_index = int(len(dataset_split) * train_ratio)
             dataset_split = dataset_split[:train_index] if split == "train" else dataset_split[train_index:]
         else:
-            dataset_split = dataset[split]
+            if full_test:
+                dataset_split = dataset[split]
+            else:
+                dataset_split = dataset[split].shuffle()
+                dataset_split = dataset_split[:5000]
 
 
 
