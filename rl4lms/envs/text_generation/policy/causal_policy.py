@@ -50,6 +50,9 @@ class CausalLMActorCriticPolicy(LMActorCriticPolicy, ActorCriticWarmStartMixin):
         prompt_truncation_side: str = "left",
         state_dict: Dict[str, Any] = None,
     ):
+        self._optimizer_class = optimizer_class
+        self._optimizer_kwargs = optimizer_kwargs
+        self._weight_decay = weight_decay
         super().__init__(
             observation_space,
             action_space,

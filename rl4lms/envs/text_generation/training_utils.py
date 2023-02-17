@@ -218,6 +218,9 @@ class OnPolicyTrainer(TrainerWarmStartMixin):
         self._reset_ema_freq = (
             _reset_freq if _reset_ema_freq is None else int(_reset_ema_freq)
         )
+        self._reset_opt = bool(self._train_eval_config.get("reset_opt", False))
+
+        # ema
         self._ref_causal_perplexity = bool(
             self._train_eval_config.get("ref_causal_perplexity", False)
         )
@@ -275,10 +278,17 @@ class OnPolicyTrainer(TrainerWarmStartMixin):
             self._alg.learn(self._n_steps_per_iter)
 
             if self._reset_freq is not None and epoch % self._reset_freq == 0:
+                logger.info("resetting policy to ref")
                 self._alg.policy._policy_model.load_state_dict(
                     self._ema_model.state_dict(), strict=False
                 )
-                logger.info("resetting policy to ref")
+
+                if self._reset_opt:
+                    self._alg.policy._setup_optimizer(
+                        optimizer_kwargs=self._alg.policy._optimizer_kwargs,
+                        weight_decay=self._alg.policy._weight_decay,
+                        optimizer_class=self._alg.policy._optimizer_class,
+                    )
 
             if (
                 self._reset_ema
