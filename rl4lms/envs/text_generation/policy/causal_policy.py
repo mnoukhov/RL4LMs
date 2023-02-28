@@ -49,10 +49,12 @@ class CausalLMActorCriticPolicy(LMActorCriticPolicy, ActorCriticWarmStartMixin):
         generation_kwargs: Dict[str, Any] = {},
         prompt_truncation_side: str = "left",
         state_dict: Dict[str, Any] = None,
+        shared_critic: bool = False,
     ):
         self._optimizer_class = optimizer_class
         self._optimizer_kwargs = optimizer_kwargs
         self._weight_decay = weight_decay
+        self._shared_critic = shared_critic
         super().__init__(
             observation_space,
             action_space,
@@ -77,7 +79,10 @@ class CausalLMActorCriticPolicy(LMActorCriticPolicy, ActorCriticWarmStartMixin):
             type(self._policy_model)
         )
 
-        self._value_model = AutoModelForCausalLM.from_pretrained(model_name)
+        if self._shared_critic:
+            self._value_model = self._policy_model
+        else:
+            self._value_model = AutoModelForCausalLM.from_pretrained(model_name)
         self._ref_model = deepcopy(self._policy_model).eval()
         for param in self._ref_model.parameters():
             param.requires_grad = False
