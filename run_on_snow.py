@@ -66,6 +66,9 @@ if __name__ == "__main__":
         "-n", "--gpus", default=1, type=int, help="number of gpus to use for experiment"
     )
     parser.add_argument(
+        "--gpu-mem", default=80, type=int, help="mem of gpus to use for experiment"
+    )
+    parser.add_argument(
         "--no-wandb", action="store_true", help="disable wandb", default=False
     )
     parser.add_argument("--seeds", type=str, default="1")
@@ -127,9 +130,8 @@ if __name__ == "__main__":
             "resources": {
                 "cpu": 4 * args.gpus,
                 "mem": 48 * args.gpus,
-                "gpu_mem": 80,
+                "gpu_mem": args.gpu_mem,
                 "gpu": args.gpus,
-                "gpu_model": "A100",
             },
             "interactive": False,
             "bid": 9999,
