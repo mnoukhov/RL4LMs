@@ -8,7 +8,11 @@ from stable_baselines3.common.distributions import CategoricalDistribution
 from stable_baselines3.common.type_aliases import Schedule, TensorDict
 from torch import nn
 from torch.distributions import Categorical
-from transformers import AutoModelForCausalLM, AutoTokenizer
+from transformers import (
+    AutoModelForCausalLM,
+    AutoModelForSequenceClassification,
+    AutoTokenizer,
+)
 from transformers.modeling_utils import unwrap_model
 
 from rl4lms.algorithms.common.maskable.distributions import (
@@ -83,13 +87,14 @@ class CausalLMActorCriticPolicy(LMActorCriticPolicy, ActorCriticWarmStartMixin):
             self._value_model = self._policy_model
         else:
             self._value_model = AutoModelForCausalLM.from_pretrained(model_name)
-        self._ref_model = deepcopy(self._policy_model).eval()
-        for param in self._ref_model.parameters():
-            param.requires_grad = False
 
         self._value_head = nn.Linear(
             self._value_model.config.hidden_size, 1, bias=False
         )
+
+        self._ref_model = deepcopy(self._policy_model).eval()
+        for param in self._ref_model.parameters():
+            param.requires_grad = False
 
         # apply model parallel
         if torch.cuda.is_available():
@@ -186,7 +191,6 @@ class CausalLMActorCriticPolicy(LMActorCriticPolicy, ActorCriticWarmStartMixin):
         obs: TensorDict,
         past_model_kwargs: Optional[Dict[str, torch.tensor]] = None,
     ) -> ValueOutput:
-
         input_ids = obs["input_encoded_pt"].int()
         attention_mask = obs["input_attention_mask_pt"]
 
@@ -224,7 +228,6 @@ class CausalLMActorCriticPolicy(LMActorCriticPolicy, ActorCriticWarmStartMixin):
     def evaluate_actions(
         self, obs: torch.Tensor, actions: torch.Tensor
     ) -> EvaluateActionsOutput:
-
         policy_outputs = self.forward_policy(obs=obs, actions=actions)
         value_outputs = self.forward_value(obs)
 
@@ -336,7 +339,6 @@ class CausalLMActorCriticPolicy(LMActorCriticPolicy, ActorCriticWarmStartMixin):
         attention_mask: torch.tensor = None,
         gen_kwargs: Dict[str, Any] = None,
     ) -> GenerationOutputs:
-
         # if it different from rollout gen kwargs
         if gen_kwargs is None:
             gen_kwargs = self._generation_kwargs
@@ -413,6 +415,123 @@ class CausalLMActorCriticPolicy(LMActorCriticPolicy, ActorCriticWarmStartMixin):
             step_wise_logprobs, step_wise_actions, gen_tokens, gen_texts
         )
         return gen_output
+
+
+class RewardValueCausalLMActorCriticPolicy(CausalLMActorCriticPolicy):
+    def __init__(
+        self,
+        observation_space: DictSpace,
+        action_space: Discrete,
+        lr_schedule: Schedule,
+        model_name: str,
+        optimizer_kwargs: Dict[str, Any] = {},
+        weight_decay: float = 1e-6,
+        use_sde: bool = None,
+        apply_model_parallel: bool = True,
+        optimizer_class: torch.optim.Optimizer = torch.optim.AdamW,
+        generation_kwargs: Dict[str, Any] = {},
+        prompt_truncation_side: str = "left",
+        state_dict: Dict[str, Any] = None,
+        shared_critic: bool = False,
+        value_model_name: str = None,
+        label_ix: int = None,
+    ):
+        self._optimizer_class = optimizer_class
+        self._optimizer_kwargs = optimizer_kwargs
+        self._weight_decay = weight_decay
+        self._shared_critic = shared_critic
+        self._value_model_name = value_model_name
+        self._label_ix = label_ix
+        super().__init__(
+            observation_space,
+            action_space,
+            lr_schedule,
+            model_name,
+            optimizer_kwargs,
+            weight_decay,
+            use_sde,
+            apply_model_parallel,
+            optimizer_class,
+            generation_kwargs,
+            prompt_truncation_side,
+        )
+        self.load_from_dict(state_dict)
+
+    def _build_model_heads(self, model_name: str):
+        self._policy_model = AutoModelForCausalLM.from_pretrained(model_name)
+        self._policy_model.__class__ = override_generation_routines(
+            type(self._policy_model)
+        )
+
+        self._value_model = AutoModelForSequenceClassification.from_pretrained(
+            self._value_model_name
+        )
+        if not hasattr(self._value_model.config, "pad_token"):
+            self._value_model.config.pad_token_id = (
+                self._value_model.config.eos_token_id
+            )
+
+        self._ref_model = deepcopy(self._policy_model).eval()
+        for param in self._ref_model.parameters():
+            param.requires_grad = False
+
+        # dummy for resets and state dict
+        self._value_head = nn.Module()
+
+        # apply model parallel
+        if torch.cuda.is_available():
+            if torch.cuda.device_count() == 1:
+                self._policy_model.to("cuda")
+                self._ref_model.to("cuda")
+                self._value_model.to("cuda")
+            elif self._apply_model_parallel and self._policy_model.is_parallelizable:
+                self._policy_model.parallelize()
+                self._ref_model.parallelize()
+                self._value_model.parallelize()
+            else:  # else defaults to data parallel
+                self._policy_model = torch.nn.DataParallel(self._policy_model)
+                self._ref_model = torch.nn.DataParallel(self._ref_model)
+                self._value_model = torch.nn.DataParallel(self._value_model)
+
+    def forward_value(
+        self,
+        obs: TensorDict,
+        past_model_kwargs: Optional[Dict[str, torch.tensor]] = None,
+    ) -> ValueOutput:
+        input_ids = obs["input_encoded_pt"].int()
+        attention_mask = obs["input_attention_mask_pt"]
+
+        # prepare inputs
+        if not past_model_kwargs:
+            past_model_kwargs = {
+                "attention_mask": attention_mask,
+            }
+        model_inputs = self._prepare_inputs_for_model(
+            self._value_model, input_ids, past_model_kwargs
+        )
+
+        # forward pass to transformers
+        output = self._value_model(**model_inputs)
+
+        scores = torch.softmax(output.logits, dim=1)
+        values = scores[:, self._label_ix]
+
+        # # update the model kwargs for further generation
+        past_model_kwargs = unwrap_model(
+            self._value_model
+        )._update_model_kwargs_for_generation(
+            output,
+            past_model_kwargs,
+            is_encoder_decoder=unwrap_model(
+                self._value_model
+            ).config.is_encoder_decoder,
+        )
+
+        value_outputs = ValueOutput(values=values, past_model_kwargs=past_model_kwargs)
+
+        # value_outputs = ValueOutput(values=values, past_model_kwargs={})
+
+        return value_outputs
 
 
 class MaskedCausalLMActorCriticPolicy(
@@ -584,7 +703,6 @@ class MaskedCausalLMActorCriticPolicy(
     def evaluate_actions(
         self, obs: torch.Tensor, actions: torch.Tensor, action_masks: torch.Tensor
     ) -> EvaluateActionsOutput:
-
         policy_outputs = self.forward_policy(
             obs=obs, actions=actions, action_masks=action_masks
         )
@@ -606,7 +724,6 @@ class MaskedCausalLMActorCriticPolicy(
         attention_mask: torch.tensor = None,
         gen_kwargs: Dict[str, Any] = None,
     ):
-
         # if it different from rollout gen kwargs
         if gen_kwargs is None:
             gen_kwargs = self._generation_kwargs

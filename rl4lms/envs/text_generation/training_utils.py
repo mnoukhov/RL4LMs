@@ -295,7 +295,8 @@ class OnPolicyTrainer(TrainerWarmStartMixin):
                     self._alg.policy._value_model.load_state_dict(
                         self._alg.policy._ref_model.state_dict(), strict=False
                     )
-                    self._alg.policy._value_head.reset_parameters()
+                    if hasattr(self._alg.policy._value_head, "reset_parameters"):
+                        self._alg.policy._value_head.reset_parameters()
 
             if (
                 self._reset_ema

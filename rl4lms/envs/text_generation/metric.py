@@ -63,6 +63,9 @@ class LearnedRewardMetric(BaseMetric):
         self._model = AutoModelForSequenceClassification.from_pretrained(model_name).to(
             self._device
         )
+        if self._tokenizer.pad_token is None:
+            self._tokenizer.pad_token = self._tokenizer.eos_token
+            self._model.config.pad_token_id = self._model.config.eos_token_id
         self._label_ix = label_ix
         self._batch_size = batch_size
         self._include_prompt_for_eval = include_prompt_for_eval
@@ -125,7 +128,6 @@ class MeteorMetric(BaseMetric):
         model: PreTrainedModel = None,
         split_name: str = None,
     ):
-
         score = self._metric.compute(
             predictions=generated_texts, references=reference_texts
         )["meteor"]
@@ -211,7 +213,6 @@ class BLEUMetric(BaseMetric):
         model: PreTrainedModel = None,
         split_name: str = None,
     ) -> Tuple[List[float], float]:
-
         tokenized_predictions = []
         tokenized_reference_texts = []
         for prediction, refs in zip(generated_texts, reference_texts):
@@ -351,7 +352,6 @@ class DiversityMetrics(BaseMetric):
         model: PreTrainedModel = None,
         split_name: str = None,
     ) -> Tuple[List[float], float]:
-
         predictions = Predictions(data={"filename": "", "values": generated_texts})
         diversity_metrics = {}
         msttr_metrics = self._msttr_metric.compute(None, predictions)
@@ -787,7 +787,6 @@ class SacreBLEUMetric(BaseMetric):
         model: PreTrainedModel = None,
         split_name: str = None,
     ) -> Tuple[List[float], float]:
-
         metric_results = self._metric.compute(
             predictions=generated_texts, references=reference_texts, **self._args
         )
@@ -810,7 +809,6 @@ class TERMetric(BaseMetric):
         model: PreTrainedModel = None,
         split_name: str = None,
     ) -> Tuple[List[float], float]:
-
         metric_results = self._metric.compute(
             predictions=generated_texts, references=reference_texts
         )
@@ -833,7 +831,6 @@ class chrFmetric(BaseMetric):
         model: PreTrainedModel = None,
         split_name: str = None,
     ) -> Tuple[List[float], float]:
-
         metric_results = self._metric.compute(
             predictions=generated_texts, references=reference_texts
         )

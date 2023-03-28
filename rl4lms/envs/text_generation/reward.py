@@ -1,23 +1,24 @@
 from abc import ABC, abstractclassmethod
+from typing import Any, Dict, List
 
+import numpy as np
 import torch
 from datasets import load_metric
-from rl4lms.envs.text_generation.observation import Observation
 from transformers import AutoModelForSequenceClassification, AutoTokenizer
+
 from rl4lms.envs.text_generation.metric import (
-    CIDERMetric,
-    MeteorMetric,
     BERTScoreMetric,
     BLEUMetric,
-    SpiceMetric,
+    CIDERMetric,
+    IntentAccuracyDailyDialog,
+    MeteorMetric,
     ParentToTTo,
     RougeLMax,
+    SpiceMetric,
     TERMetric,
     chrFmetric,
-    IntentAccuracyDailyDialog,
 )
-import numpy as np
-from typing import List, Dict, Any
+from rl4lms.envs.text_generation.observation import Observation
 
 
 class RewardFunction(ABC):
@@ -143,7 +144,6 @@ class MeteorRewardFunction(RewardFunction):
         done: bool,
         meta_info: Dict[str, Any] = None,
     ) -> float:
-
         # compute meteor at the end of episode
         if done:
             references = [next_observation.target_or_reference_texts]
@@ -389,12 +389,18 @@ class SpiderRewardFunction(BatchedRewardFunction):
 
 class LearnedRewardFunction(RewardFunction):
     def __init__(
-        self, model_name: str, label_ix: int, include_prompt_for_eval: bool = True
+        self,
+        model_name: str,
+        label_ix: int,
+        include_prompt_for_eval: bool = True,
+        pad_token_as_eos_token: bool = False,
     ) -> None:
         super().__init__()
         self._device = "cuda" if torch.cuda.is_available() else "cpu"
         self._metric_tokenizer = AutoTokenizer.from_pretrained(model_name)
         self._metric_tokenizer.truncation_side = "left"
+        if self._metric_tokenizer.pad_token is None and pad_token_as_eos_token:
+            self._metric_tokenizer.pad_token = self._metric_tokenizer.eos_token
         self._metric_model = AutoModelForSequenceClassification.from_pretrained(
             model_name
         ).to(self._device)
@@ -517,7 +523,6 @@ class TER(RewardFunction):
         done: bool,
         meta_info: Dict[str, Any] = None,
     ) -> float:
-
         # compute score at the end of episode
         if done:
             references = [next_observation.target_or_reference_texts]
@@ -542,7 +547,6 @@ class chrF(RewardFunction):
         done: bool,
         meta_info: Dict[str, Any] = None,
     ) -> float:
-
         # compute score at the end of episode
         if done:
             references = [next_observation.target_or_reference_texts]
@@ -572,7 +576,6 @@ class IntentAccuracy(BatchedRewardFunction):
         dones: List[bool],
         meta_infos: List[Dict[str, Any]] = None,
     ) -> List[float]:
-
         if self._metric is None:
             self._metric = IntentAccuracyDailyDialog()
 

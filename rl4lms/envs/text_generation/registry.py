@@ -51,6 +51,7 @@ from rl4lms.envs.text_generation.policy.base_policy import LMActorCriticPolicy
 from rl4lms.envs.text_generation.policy.causal_policy import (
     CausalLMActorCriticPolicy,
     MaskedCausalLMActorCriticPolicy,
+    RewardValueCausalLMActorCriticPolicy,
 )
 from rl4lms.envs.text_generation.policy.seq2seq_policy import (
     MaskedSeq2SeqLMActorCriticPolicy,
@@ -187,6 +188,7 @@ class MetricRegistry:
 class PolicyRegistry:
     _registry = {
         "causal_lm_actor_critic_policy": CausalLMActorCriticPolicy,
+        "reward_value_causal_lm_actor_critic_policy": RewardValueCausalLMActorCriticPolicy,
         "seq2seq_lm_actor_critic_policy": Seq2SeqLMActorCriticPolicy,
         "maskable_causal_lm_actor_critic_policy": MaskedCausalLMActorCriticPolicy,
         "maskable_seq2seq_lm_actor_critic_policy": MaskedSeq2SeqLMActorCriticPolicy,
