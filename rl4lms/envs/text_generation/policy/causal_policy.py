@@ -442,6 +442,7 @@ class RewardValueCausalLMActorCriticPolicy(CausalLMActorCriticPolicy):
         self._shared_critic = shared_critic
         self._value_model_name = value_model_name
         self._label_ix = label_ix
+        assert self._label_ix is not None
         super().__init__(
             observation_space,
             action_space,
@@ -528,8 +529,6 @@ class RewardValueCausalLMActorCriticPolicy(CausalLMActorCriticPolicy):
         )
 
         value_outputs = ValueOutput(values=values, past_model_kwargs=past_model_kwargs)
-
-        # value_outputs = ValueOutput(values=values, past_model_kwargs={})
 
         return value_outputs
 

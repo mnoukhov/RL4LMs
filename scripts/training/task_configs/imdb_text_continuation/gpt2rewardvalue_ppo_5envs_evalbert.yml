@@ -54,7 +54,7 @@ train_evaluation:
   metrics:
     - id: learned_reward
       args: 
-        model_name: mnoukhov/gpt2-imdb-sentiment-classifier
+        model_name: lvwerra/distilbert-imdb
         label_ix: 1
         batch_size: 100
     - id: causal_perplexity
