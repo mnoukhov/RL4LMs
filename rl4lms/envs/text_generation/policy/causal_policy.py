@@ -513,7 +513,7 @@ class RewardValueCausalLMActorCriticPolicy(CausalLMActorCriticPolicy):
         # forward pass to transformers
         output = self._value_model(**model_inputs)
 
-        scores = torch.softmax(output.logits, dim=1)
+        scores = torch.softmax(output.logits.to(self.device), dim=1)
         values = scores[:, self._label_ix]
 
         # # update the model kwargs for further generation
