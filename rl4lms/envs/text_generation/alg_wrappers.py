@@ -128,7 +128,6 @@ def wrap_onpolicy_alg(
             past_state: Dict[str, torch.tensor],
             action_mask: torch.tensor,
         ):
-
             policy_kwargs = {
                 "obs": obs,
                 "actions": action,
@@ -327,7 +326,6 @@ def wrap_onpolicy_alg(
 
                     # if the buffer is full, compute advantages
                     if rollout_buffer.full and not advantages_computed:
-
                         # normalize the rewards
                         if self._norm_reward:
                             mean = rollout_buffer.rewards.mean()
