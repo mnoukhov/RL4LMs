@@ -220,6 +220,7 @@ class OnPolicyTrainer(TrainerWarmStartMixin):
         )
         self._reset_opt = bool(self._train_eval_config.get("reset_opt", False))
         self._reset_critic = bool(self._train_eval_config.get("reset_critic", False))
+        self._freeze_policy = bool(self._train_eval_config.get("freeze_policy", False))
 
         # ema
         self._ref_causal_perplexity = bool(
@@ -269,6 +270,10 @@ class OnPolicyTrainer(TrainerWarmStartMixin):
         epoch = iter_start
         if self.eval_before_train:
             self._evaluate_on_datapools(epoch=iter_start)
+
+        if self._freeze_policy:
+            for p in self._alg.policy._policy_model.parameters():
+                p.required_grad = False
 
         # train for given number of iters
         for epoch in range(iter_start, self._n_iters):
