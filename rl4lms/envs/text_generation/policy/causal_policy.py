@@ -54,11 +54,13 @@ class CausalLMActorCriticPolicy(LMActorCriticPolicy, ActorCriticWarmStartMixin):
         prompt_truncation_side: str = "left",
         state_dict: Dict[str, Any] = None,
         shared_critic: bool = False,
+        value_head_layers: int = 1,
     ):
         self._optimizer_class = optimizer_class
         self._optimizer_kwargs = optimizer_kwargs
         self._weight_decay = weight_decay
         self._shared_critic = shared_critic
+        self._value_head_layers = value_head_layers
         super().__init__(
             observation_space,
             action_space,
@@ -88,9 +90,26 @@ class CausalLMActorCriticPolicy(LMActorCriticPolicy, ActorCriticWarmStartMixin):
         else:
             self._value_model = AutoModelForCausalLM.from_pretrained(model_name)
 
-        self._value_head = nn.Linear(
-            self._value_model.config.hidden_size, 1, bias=False
-        )
+        if self._value_head_layers == 1:
+            self._value_head = nn.Linear(
+                self._value_model.config.hidden_size, 1, bias=False
+            )
+        else:
+            layers = [
+                module
+                for _ in range(self._value_head_layers - 1)
+                for module in (
+                    nn.Linear(
+                        self._value_model.config.hidden_size,
+                        self._value_model.config.hidden_size,
+                    ),
+                    nn.ReLU(),
+                )
+            ]
+            layers.append(
+                nn.Linear(self._value_model.config.hidden_size, 1, bias=False)
+            )
+            self._value_head = nn.Sequential(*layers)
 
         self._ref_model = deepcopy(self._policy_model).eval()
         for param in self._ref_model.parameters():
@@ -443,6 +462,7 @@ class RewardValueCausalLMActorCriticPolicy(CausalLMActorCriticPolicy):
         self._value_model_name = value_model_name
         self._label_ix = label_ix
         assert self._label_ix is not None
+
         super().__init__(
             observation_space,
             action_space,
