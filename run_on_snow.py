@@ -124,7 +124,8 @@ if __name__ == "__main__":
                 "HOME=/home/toolkit",
                 f"HF_HOME=/home/toolkit/huggingface/",
                 f"WANDB_API_KEY={wandb_api_key}",
-                f"WANDB_RESUME=allow",
+                "WANDB_RESUME=allow",
+                "WANDB__SERVICE_WAIT=300",
             ],
             "restartable": True,
             "resources": {
