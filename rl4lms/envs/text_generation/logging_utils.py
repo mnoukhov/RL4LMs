@@ -1,25 +1,29 @@
-from collections import defaultdict
-from typing import Dict, Any, List
-import os
-import json
-import jsonlines
-import wandb
-import pandas as pd
-from transformers import AutoModel
-import logging
 import copy
+import json
+import logging
+import os
 import random
+from collections import defaultdict
+from typing import Any, Dict, List
+
+import jsonlines
+import pandas as pd
 from rich.logging import RichHandler
+from transformers import AutoModel
+
+import wandb
 
 
 class Tracker:
-    def __init__(self,
-                 base_path_to_store_results: str,
-                 run_config: Dict[str, Any],
-                 project_name: str,
-                 experiment_name: str,
-                 entity_name: str = None,
-                 wandb_log: bool = False):
+    def __init__(
+        self,
+        base_path_to_store_results: str,
+        run_config: Dict[str, Any],
+        project_name: str,
+        experiment_name: str,
+        entity_name: str = None,
+        wandb_log: bool = False,
+    ):
         self._base_path_to_store_results = base_path_to_store_results
         self._config = run_config
         self._experiment_name = experiment_name
@@ -31,9 +35,8 @@ class Tracker:
     def _init(self):
         # create a folder
         self._run_path = os.path.join(
-            self._base_path_to_store_results,
-            self._project_name,
-            self._experiment_name)
+            self._base_path_to_store_results, self._project_name, self._experiment_name
+        )
         os.makedirs(self._run_path, exist_ok=True)
 
         # store also the config into it
@@ -46,10 +49,7 @@ class Tracker:
         logging.basicConfig(
             level=logging.DEBUG,
             format="%(asctime)s [%(levelname)s] %(message)s",
-            handlers=[
-                logging.FileHandler(log_path),
-                RichHandler()
-            ]
+            handlers=[logging.FileHandler(log_path), RichHandler()],
         )
 
         # init wandb
@@ -58,15 +58,14 @@ class Tracker:
                 entity=self._entity_name,
                 project=self._project_name,
                 name=self._experiment_name,
-                config=self._config
+                config=self._config,
             )
 
-    def log_predictions(self, epoch: int,
-                        split_name: str,
-                        predictions: List[Dict]):
+    def log_predictions(self, epoch: int, split_name: str, predictions: List[Dict]):
         # log them per epoch in a separate file as they can get huge
         prediction_file_at_epoch = os.path.join(
-            self._run_path, f"epoch_{epoch}_{split_name}_split_predictions.json")
+            self._run_path, f"epoch_{epoch}_{split_name}_split_predictions.json"
+        )
         with open(prediction_file_at_epoch, "w") as fp:
             json.dump(predictions, fp)
 
@@ -92,26 +91,27 @@ class Tracker:
 
             predictions_as_df = to_df(predictions)
             predictions_table_at_epoch = wandb.Table(data=predictions_as_df)
-            self._wandb_run.log({
-                f"{split_name}_predictions_at_epoch_{epoch}": predictions_table_at_epoch})
+            self._wandb_run.log(
+                {
+                    f"{split_name}_predictions_at_epoch_{epoch}": predictions_table_at_epoch
+                }
+            )
 
-    def log_metrics(self, epoch: int,
-                    split_name: str,
-                    metrics_dict: Dict[str, float]):
+    def log_metrics(self, epoch: int, split_name: str, metrics_dict: Dict[str, float]):
         # for each split, one file
         metric_file_per_split = os.path.join(
-            self._run_path, f"{split_name}_split_metrics.jsonl")
-        metrics_dict_ = {
-            "epoch": epoch,
-            "metrics": metrics_dict
-        }
+            self._run_path, f"{split_name}_split_metrics.jsonl"
+        )
+        metrics_dict_ = {"epoch": epoch, "metrics": metrics_dict}
         with jsonlines.open(metric_file_per_split, "a") as writer:
             writer.write(metrics_dict_)
 
         # log to wandb
         if self._wandb_log:
             metric_dict_ = {
-                f"{split_name}/{metric_key}": value for metric_key, value in metrics_dict.items()}
+                f"{split_name}/{metric_key}": value
+                for metric_key, value in metrics_dict.items()
+            }
             metric_dict_["epoch"] = epoch
             wandb.log(metric_dict_)
 
@@ -120,8 +120,7 @@ class Tracker:
 
     def log_rollout_infos(self, rollout_info: Dict[str, float]):
         logging.info(f"Rollout Info: {rollout_info}")
-        rollout_info_file = os.path.join(
-            self._run_path, "rollout_info.jsonl")
+        rollout_info_file = os.path.join(self._run_path, "rollout_info.jsonl")
         with jsonlines.open(rollout_info_file, mode="a") as writer:
             writer.write(rollout_info)
 
@@ -131,8 +130,7 @@ class Tracker:
 
     def log_training_infos(self, training_info: Dict[str, float]):
         logging.info(f"Training Info: {training_info}")
-        training_info_file = os.path.join(
-            self._run_path, "training_info.jsonl")
+        training_info_file = os.path.join(self._run_path, "training_info.jsonl")
         with jsonlines.open(training_info_file, mode="a") as writer:
             writer.write(training_info)
 
@@ -158,17 +156,20 @@ class Tracker:
 
 if __name__ == "__main__":
     base_path = "/scratch/test_logs"
-    run_config = {
-        "param_1": 1,
-        "param_2": 2
-    }
+    run_config = {"param_1": 1, "param_2": 2}
     predictions = {
-        "1": [{"sample_id": "1", "prompt_text": "Hello", "gen_text": "I am there"},
-              {"sample_id": "2", "prompt_text": "Hi", "gen_text": "there"}],
-        "2": [{"sample_id": "1", "prompt_text": "Hello", "gen_text": "I am there"},
-              {"sample_id": "2", "prompt_text": "Hi", "gen_text": "there"}],
-        "3": [{"sample_id": "1", "prompt_text": "Hello", "gen_text": "I am there"},
-              {"sample_id": "2", "prompt_text": "Hi", "gen_text": "there"}],
+        "1": [
+            {"sample_id": "1", "prompt_text": "Hello", "gen_text": "I am there"},
+            {"sample_id": "2", "prompt_text": "Hi", "gen_text": "there"},
+        ],
+        "2": [
+            {"sample_id": "1", "prompt_text": "Hello", "gen_text": "I am there"},
+            {"sample_id": "2", "prompt_text": "Hi", "gen_text": "there"},
+        ],
+        "3": [
+            {"sample_id": "1", "prompt_text": "Hello", "gen_text": "I am there"},
+            {"sample_id": "2", "prompt_text": "Hi", "gen_text": "there"},
+        ],
     }
 
     metrics = {

@@ -55,12 +55,14 @@ class CausalLMActorCriticPolicy(LMActorCriticPolicy, ActorCriticWarmStartMixin):
         state_dict: Dict[str, Any] = None,
         shared_critic: bool = False,
         value_head_layers: int = 1,
+        value_checkpoint_path: str = None,
     ):
         self._optimizer_class = optimizer_class
         self._optimizer_kwargs = optimizer_kwargs
         self._weight_decay = weight_decay
         self._shared_critic = shared_critic
         self._value_head_layers = value_head_layers
+        self._value_checkpoint_path = value_checkpoint_path
         super().__init__(
             observation_space,
             action_space,
@@ -114,6 +116,11 @@ class CausalLMActorCriticPolicy(LMActorCriticPolicy, ActorCriticWarmStartMixin):
         self._ref_model = deepcopy(self._policy_model).eval()
         for param in self._ref_model.parameters():
             param.requires_grad = False
+
+        if self._value_checkpoint_path is not None:
+            ckpt = torch.load(self._value_checkpoint_path)
+            self._value_model.load_state_dict(ckpt["policy_state"]["value_model"])
+            self._value_head.load_state_dict(ckpt["policy_state"]["value_head"])
 
         # apply model parallel
         if torch.cuda.is_available():

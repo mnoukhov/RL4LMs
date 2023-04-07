@@ -273,7 +273,7 @@ class OnPolicyTrainer(TrainerWarmStartMixin):
 
         if self._freeze_policy:
             for p in self._alg.policy._policy_model.parameters():
-                p.required_grad = False
+                p.requires_grad = False
 
         # train for given number of iters
         for epoch in range(iter_start, self._n_iters):
