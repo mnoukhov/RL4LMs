@@ -334,6 +334,7 @@ class OnPolicyTrainer(TrainerWarmStartMixin):
         # save model here - we save only the language model
         if self._tracker is not None and self._n_iters > 0:
             self._tracker.save_auto_model(self._alg.policy.get_language_model())
+            self._tracker.save_auto_model(self._alg.policy._value_model, "value_model")
 
 
 class SupervisedTrainer:

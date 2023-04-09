@@ -142,8 +142,8 @@ class Tracker:
         if self._wandb_log:
             wandb.finish()
 
-    def save_auto_model(self, model: AutoModel):
-        model_path = os.path.join(self._run_path, "model")
+    def save_auto_model(self, model: AutoModel, name="model"):
+        model_path = os.path.join(self._run_path, name)
         model.save_pretrained(model_path)
 
     @property
