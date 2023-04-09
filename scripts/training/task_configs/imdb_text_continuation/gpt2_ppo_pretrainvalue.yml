@@ -38,6 +38,7 @@ alg:
     id: causal_lm_actor_critic_policy
     args:
       model_name: lvwerra/gpt2-imdb
+      value_checkpoint_path: /home/toolkit/RL4LMs/results/90facaa85debe9a27dca37bad7570c18/rl4lms/gpt2_ppo_trainvalue.yml/checkpoints/checkpoint_1 
       apply_model_parallel: False
       generation_kwargs:
         do_sample: True
