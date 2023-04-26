@@ -221,12 +221,16 @@ class OnPolicyTrainer(TrainerWarmStartMixin):
         self._reset_opt = bool(self._train_eval_config.get("reset_opt", False))
         self._reset_critic = bool(self._train_eval_config.get("reset_critic", False))
         self._freeze_policy = bool(self._train_eval_config.get("freeze_policy", False))
+        # tuple of ints
         _freeze_value_epochs = self._train_eval_config.get("freeze_value_epochs", None)
         self._freeze_value_epochs = (
             _freeze_value_epochs
             if _freeze_value_epochs is None
-            else int(_freeze_value_epochs)
+            else tuple(int(epoch) for epoch in _freeze_value_epochs.split(","))
         )
+
+        if len(self._freeze_value_epochs) == 1:
+            self._freeze_value_epochs = (0, self._freeze_value_epochs[0])
 
         # ema
         self._ref_causal_perplexity = bool(
@@ -281,21 +285,19 @@ class OnPolicyTrainer(TrainerWarmStartMixin):
             for p in self._alg.policy._policy_model.parameters():
                 p.requires_grad = False
 
-        if self._freeze_value_epochs is not None:
-            for p in self._alg.policy._value_model.parameters():
-                p.requires_grad = False
-
         # train for given number of iters
         for epoch in range(iter_start, self._n_iters):
             # current state
             self._trainer_state["current_iter"] = epoch
-
-            if (
-                self._freeze_value_epochs is not None
-                and epoch == self._freeze_value_epochs
-            ):
-                for p in self._alg.policy._value_model.parameters():
-                    p.requires_grad = True
+            if self._freeze_value_epochs is not None:
+                # freeze at start epoch
+                if epoch == self._freeze_value_epochs[0]:
+                    for p in self._alg.policy._value_model.parameters():
+                        p.requires_grad = False
+                # unfreeze at end epoch
+                elif epoch == self._freeze_value_epochs[1]:
+                    for p in self._alg.policy._value_model.parameters():
+                        p.requires_grad = True
 
             # inner rollout and learn loop for on-policy algorithm
             self._alg.learn(self._n_steps_per_iter)
