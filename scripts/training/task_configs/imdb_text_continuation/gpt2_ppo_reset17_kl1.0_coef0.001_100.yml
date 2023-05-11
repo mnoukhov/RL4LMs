@@ -32,8 +32,8 @@ alg:
     n_epochs: 5
     
   kl_div:
-    coeff: 0.1
-    target_kl: 0.5
+    coeff: 0.001
+    target_kl: 1.0
   policy:
     id: causal_lm_actor_critic_policy
     args:
@@ -46,6 +46,7 @@ alg:
       
 train_evaluation:
   eval_batch_size: 256
+  reset_freq: 17
   n_iters: 100
   eval_every: 10
   metrics:

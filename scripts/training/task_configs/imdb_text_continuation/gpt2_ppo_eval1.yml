@@ -46,8 +46,9 @@ alg:
       
 train_evaluation:
   eval_batch_size: 256
-  n_iters: 100
-  eval_every: 10
+  n_iters: 50
+  eval_every: 1
+  save_every: 100
   metrics:
     - id: learned_reward
       args: 
