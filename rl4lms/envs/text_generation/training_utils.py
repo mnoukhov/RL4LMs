@@ -204,7 +204,7 @@ class OnPolicyTrainer(TrainerWarmStartMixin):
         # gen kwargs for evaluation (if it is different from rollout gen kwargs)
         _seed = self._train_eval_config.get("seed", None)
         self._seed = None if _seed is None else int(_seed)
-        self._save_every = self._train_eval_config.get("save_every", 20)
+        self._save_every = self._train_eval_config.get("save_every")
         self._eval_every = self._train_eval_config.get("eval_every")
         self._eval_gen_kwargs = self._train_eval_config.get("generation_kwargs", None)
 
@@ -223,14 +223,14 @@ class OnPolicyTrainer(TrainerWarmStartMixin):
         self._freeze_policy = bool(self._train_eval_config.get("freeze_policy", False))
         # tuple of ints
         _freeze_value_epochs = self._train_eval_config.get("freeze_value_epochs", None)
-        self._freeze_value_epochs = (
-            _freeze_value_epochs
-            if _freeze_value_epochs is None
-            else tuple(int(epoch) for epoch in _freeze_value_epochs.split(","))
-        )
-
-        if len(self._freeze_value_epochs) == 1:
-            self._freeze_value_epochs = (0, self._freeze_value_epochs[0])
+        if _freeze_value_epochs is None:
+            self._freeze_value_epochs = None
+        elif "," in _freeze_value_epochs:
+            self._freeze_value_epochs = tuple(
+                int(epoch) for epoch in _freeze_value_epochs.split(",")
+            )
+        else:
+            self._freeze_value_epochs = (0, int(_freeze_value_epochs))
 
         # ema
         self._ref_causal_perplexity = bool(
@@ -338,13 +338,13 @@ class OnPolicyTrainer(TrainerWarmStartMixin):
                 self._ema_model.eval()
 
             # save the policy checkpoint
-            if (epoch + 1) % self._save_every == 0:
+            if self._save_every is not None and (epoch + 1) % self._save_every == 0:
                 self.save_trainer_state(
                     self._tracker, self._alg.policy, self._trainer_state
                 )
 
             # evaluate on val set in the given intervals
-            if (epoch + 1) % self._eval_every == 0:
+            if self._eval_every is not None and (epoch + 1) % self._eval_every == 0:
                 self._evaluate_on_datapools(epoch=epoch, splits=["val"])
 
         # finally evaluate on val and test samples

@@ -530,6 +530,121 @@ class Perplexity(BaseMetric):
         return torch.exp(torch.stack(nlls).sum() / end_loc)
 
 
+class MultiPerplexity(BaseMetric):
+    def __init__(
+        self,
+        stride: int,
+        tokenizer_id: str,
+        model_type: str = "causal",
+        compute_pos: bool = False,
+        use_text_from_meta_data: bool = False,
+    ) -> None:
+        super().__init__()
+        self._tokenizer_id = tokenizer_id
+        self._model_type = model_type
+        self._stride = stride
+        self._compute_pos = compute_pos
+        self._use_text_from_meta_data = use_text_from_meta_data
+
+    def get_device(self, model: PreTrainedModel):
+        try:
+            return model.transformer.first_device
+        except:
+            return model.device
+
+    def compute(
+        self,
+        prompt_texts: List[str],
+        generated_texts: List[str],
+        reference_texts: List[List[str]],
+        meta_infos: List[Dict[str, Any]] = None,
+        models: List[PreTrainedModel] = None,
+        split_name: str = None,
+    ) -> Tuple[List[float], float]:
+        if split_name == "train":
+            return {}
+
+        if self._model_type != "causal":
+            raise NotImplementedError
+
+        # we compute perplexity on reference texts
+        if self._use_text_from_meta_data:
+            reference_texts = [info["reference"] for info in meta_infos]
+        else:
+            reference_texts = [ref for refs in reference_texts for ref in refs]
+
+        tokenizer = AutoTokenizer.from_pretrained(self._tokenizer_id)
+        ppl = self.compute_ppl(reference_texts, models, tokenizer)
+
+        metric_dict = {
+            "fluency_metrics/perplexity": (
+                None,
+                ppl.item(),
+            )
+        }
+
+        if meta_infos is not None and self._compute_pos:
+            pos_texts = [
+                text
+                for text, meta in zip(reference_texts, meta_infos)
+                if meta["label"] == 1
+            ]
+
+            pos_ppl = self.compute_ppl(pos_texts, model, tokenizer)
+
+            metric_dict["fluency_metrics/pos_perplexity"] = (
+                None,
+                pos_ppl.item(),
+            )
+
+        return metric_dict
+
+    def compute_ppl(
+        self,
+        texts: List[str],
+        models: List[PreTrainedModel],
+        tokenizer: PreTrainedTokenizer,
+    ):
+        encodings = tokenizer("\n\n".join(texts), return_tensors="pt")
+
+        device = self.get_device(model)
+
+        nlls = []
+        max_length = model.config.n_positions
+        seq_len = encodings.input_ids.size(1)
+        assert self._stride <= max_length, (
+            "Your PPL stride is larger than model's max length "
+            " and therefore is not capturing some part of the input"
+        )
+
+        prev_end_loc = 0
+        for begin_loc in tqdm(range(0, seq_len, self._stride)):
+            end_loc = min(begin_loc + max_length, seq_len)
+            # since trg_len may be different from stride on last loop
+            trg_len = end_loc - prev_end_loc
+
+            # run on last device
+            input_ids = encodings.input_ids[:, begin_loc:end_loc].to(device)
+            target_ids = input_ids.clone()
+            target_ids[:, :-trg_len] = -100
+
+            for model in models:
+                losses = []
+                with torch.no_grad():
+                    outputs = model(input_ids, labels=target_ids)
+                    losses.append(outputs.loss)
+
+                neg_log_likelihood = (sum(losses) / len(losses)) * trg_len
+
+            nlls.append(neg_log_likelihood)
+
+            prev_end_loc = end_loc
+            if end_loc == seq_len:
+                break
+
+        return torch.exp(torch.stack(nlls).sum() / end_loc)
+
+
 class LMPerplexity(BaseMetric):
     """Language Model Perplexity
 
