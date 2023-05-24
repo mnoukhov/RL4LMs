@@ -27,11 +27,6 @@ def compute_metrics(eval_preds):
 
 
 if __name__ == "__main__":
-    wandb.init(
-        entity="mila-language-drift",
-        project="rl4lms",
-        name="gpt2-sentiment-classifier",
-    )
     ds = load_dataset("imdb")
 
     model_name = "gpt2"
@@ -46,7 +41,7 @@ if __name__ == "__main__":
 
     training_args = TrainingArguments(
         num_train_epochs=1,
-        output_dir="/home/toolkit/gpt2-imdb-sentiment-classifier",
+        output_dir="gpt2-imdb-sentiment-classifier",
         push_to_hub=True,
         per_device_train_batch_size=16,
         per_device_eval_batch_size=16,
