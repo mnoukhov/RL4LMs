@@ -150,14 +150,14 @@ class CausalLMActorCriticPolicy(LMActorCriticPolicy, ActorCriticWarmStartMixin):
             input_ids, **model_kwargs
         )
 
-        if self._apply_model_parallel and unwrap_model(model).is_parallelizable:
-            # if model is in parallel mode, move the tensors to the first device
-            model_inputs = {
-                key: value.to(model.transformer.first_device)
-                if isinstance(value, torch.Tensor)
-                else value
-                for key, value in model_inputs.items()
-            }
+        # if self._apply_model_parallel and unwrap_model(model).is_parallelizable:
+        #     # if model is in parallel mode, move the tensors to the first device
+        #     model_inputs = {
+        #         key: value.to(model.transformer.first_device)
+        #         if isinstance(value, torch.Tensor)
+        #         else value
+        #         for key, value in model_inputs.items()
+        #     }
         return model_inputs
 
     def forward_policy(
